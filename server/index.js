@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const sqlite3 = require('sqlite3').verbose();
+let sqlite3 = null;
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { MongoClient } = require('mongodb');
@@ -11,12 +11,21 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const db = new sqlite3.Database('data.db');
+let db = null;
+let SQLITE_READY = false;
+try {
+  sqlite3 = require('sqlite3').verbose();
+  db = new sqlite3.Database('data.db');
+  SQLITE_READY = true;
+} catch (e) {
+  console.warn('SQLite disabled:', e.message);
+}
 let SALES_HAS_TOTAL_AMOUNT = false;
 let PURCHASES_HAS_TOTAL_COST = false;
-// Improve SQLite concurrency and reduce "database is locked" errors
-db.exec('PRAGMA journal_mode = WAL');
-db.exec('PRAGMA busy_timeout = 3000');
+if (SQLITE_READY) {
+  db.exec('PRAGMA journal_mode = WAL');
+  db.exec('PRAGMA busy_timeout = 3000');
+}
 
 let MONGO_READY = false;
 let mongoDb = null;
@@ -55,6 +64,14 @@ try {
     mongoDb = client.db(MONGO_DB_NAME);
     MONGO_READY = true;
     console.log('Mongo connected:', MONGO_URL, MONGO_DB_NAME);
+    mongoDb.collection('users').findOne({ username: 'admin' }).then(u => {
+      if (!u) {
+        nextId('users').then(id => {
+          const hash = bcrypt.hashSync('admin123', 10);
+          mongoDb.collection('users').insertOne({ id, username: 'admin', password_hash: hash, role: 'admin' }).catch(() => {});
+        });
+      }
+    }).catch(() => {});
   }).catch((e) => {
     console.warn('Mongo disabled:', e.message);
   });
@@ -63,7 +80,7 @@ try {
 }
 
 // Create tables if not exist
-db.serialize(() => {
+if (SQLITE_READY) db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS sales (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sale_date TEXT,
@@ -277,6 +294,29 @@ function pad2(n) { return String(n).padStart(2, '0'); }
 // Sales endpoints
 app.get('/sales', (req, res) => {
   const { month, year, payment_status } = req.query;
+  if (MONGO_READY) {
+    const m = String(month || '').padStart(2, '0');
+    const y = String(year || '');
+    const filter = {};
+    if (month && year) filter.sale_date = { $regex: `^${y}-${m}` };
+    if (payment_status && payment_status !== 'all') filter.payment_status = payment_status;
+    return mongoDb.collection('sales').find(filter).sort({ sale_date: 1, id: 1 }).toArray()
+      .then(rows => res.json(rows.map(r => ({
+        id: r.id,
+        sale_date: r.sale_date,
+        customer_name: r.customer_name || '',
+        tea_type: r.tea_type || '',
+        price_per_kg: Number(r.price_per_kg || 0),
+        weight: Number(r.weight || 0),
+        payment_status: r.payment_status || 'pending',
+        ticket_name: r.ticket_name || null,
+        contract: r.contract || null,
+        created_by: r.created_by || null,
+        issued_by: r.issued_by || null,
+        total_amount: Number(r.total_amount != null ? r.total_amount : (Number(r.price_per_kg || 0) * Number(r.weight || 0)))
+      })))).catch(err => res.status(500).json({ message: 'DB error', detail: err.message }));
+  }
+  if (!SQLITE_READY) return res.status(500).json({ message: 'DB error', detail: 'SQLite disabled' });
   const where = [];
   const params = [];
   if (month && year) {
@@ -435,6 +475,27 @@ app.delete('/sales/:id', requireAdmin, (req, res) => {
 // Purchases endpoints
 app.get('/purchases', (req, res) => {
   const { month, year, payment_status } = req.query;
+  if (MONGO_READY) {
+    const m = String(month || '').padStart(2, '0');
+    const y = String(year || '');
+    const filter = {};
+    if (month && year) filter.purchase_date = { $regex: `^${y}-${m}` };
+    if (payment_status && payment_status !== 'all') filter.payment_status = payment_status;
+    return mongoDb.collection('purchases').find(filter).sort({ purchase_date: 1, id: 1 }).toArray()
+      .then(rows => res.json(rows.map(r => ({
+        id: r.id,
+        purchase_date: r.purchase_date,
+        supplier_name: r.supplier_name || '',
+        weight: Number(r.weight || 0),
+        unit_price: Number(r.unit_price || 0),
+        payment_status: r.payment_status || 'pending',
+        water_percent: r.water_percent == null ? null : Number(r.water_percent),
+        net_weight: r.net_weight == null ? null : Number(r.net_weight),
+        ticket_name: r.ticket_name || null,
+        total_cost: Number(r.total_cost != null ? r.total_cost : (Number(r.unit_price || 0) * Number(r.net_weight != null ? r.net_weight : (r.weight || 0))))
+      })))).catch(err => res.status(500).json({ message: 'DB error', detail: err.message }));
+  }
+  if (!SQLITE_READY) return res.status(500).json({ message: 'DB error', detail: 'SQLite disabled' });
   const where = [];
   const params = [];
   if (month && year) {
@@ -957,6 +1018,16 @@ app.post('/auth/login', (req, res) => {
   const username = b.username ?? q.username ?? b.u ?? q.u;
   const password = b.password ?? q.password ?? b.p ?? q.p;
   if (!username || !password) return res.status(400).json({ message: 'Missing username/password' });
+  if (MONGO_READY) {
+    return mongoDb.collection('users').findOne({ username }).then(row => {
+      if (!row) return res.status(401).json({ message: 'Invalid credentials' });
+      const ok = bcrypt.compareSync(password, row.password_hash || '');
+      if (!ok) return res.status(401).json({ message: 'Invalid credentials' });
+      const token = jwt.sign({ uid: row.id, username: row.username, role: row.role || 'user' }, JWT_SECRET, { expiresIn: '7d' });
+      res.json({ token, role: row.role || 'user' });
+    }).catch(err => res.status(500).json({ message: 'DB error', detail: err.message }));
+  }
+  if (!SQLITE_READY) return res.status(500).json({ message: 'DB error', detail: 'SQLite disabled' });
   db.get(`SELECT id, username, password_hash, role FROM users WHERE username = ?`, [username], (err, row) => {
     if (err) return res.status(500).json({ message: 'DB error', detail: err.message });
     if (!row) return res.status(401).json({ message: 'Invalid credentials' });
@@ -970,6 +1041,16 @@ app.post('/auth/login', (req, res) => {
 app.post('/auth/change-password', requireAuth, (req, res) => {
   const { old_password, new_password } = req.body;
   if (!old_password || !new_password) return res.status(400).json({ message: 'Missing old/new password' });
+  if (MONGO_READY) {
+    return mongoDb.collection('users').findOne({ id: Number(req.user.uid) }).then(row => {
+      if (!row) return res.status(404).json({ message: 'User not found' });
+      const ok = bcrypt.compareSync(old_password, row.password_hash || '');
+      if (!ok) return res.status(401).json({ message: 'Invalid old password' });
+      const hash = bcrypt.hashSync(String(new_password), 10);
+      mongoDb.collection('users').updateOne({ id: Number(req.user.uid) }, { $set: { password_hash: hash } }).then(() => res.json({ changed: 1 })).catch(e => res.status(500).json({ message: 'DB error', detail: e.message }));
+    }).catch(err => res.status(500).json({ message: 'DB error', detail: err.message }));
+  }
+  if (!SQLITE_READY) return res.status(500).json({ message: 'DB error', detail: 'SQLite disabled' });
   db.get(`SELECT id, password_hash FROM users WHERE id = ?`, [req.user.uid], (err, row) => {
     if (err) return res.status(500).json({ message: 'DB error', detail: err.message });
     if (!row) return res.status(404).json({ message: 'User not found' });
@@ -985,6 +1066,12 @@ app.post('/auth/change-password', requireAuth, (req, res) => {
 
 // Users & Roles management (admin only)
 app.get('/users', requireAdmin, (req, res) => {
+  if (MONGO_READY) {
+    return mongoDb.collection('users').find({}).sort({ username: 1, id: 1 }).toArray().then(rows => {
+      res.json(rows.map(r => ({ id: r.id, username: r.username, role: r.role || 'user' })));
+    }).catch(e => res.status(500).json({ message: 'DB error', detail: e.message }));
+  }
+  if (!SQLITE_READY) return res.status(500).json({ message: 'DB error', detail: 'SQLite disabled' });
   db.all(`PRAGMA table_info(users)`, [], (e, cols) => {
     if (e) return res.status(500).json({ message: 'DB error', detail: e.message });
     const hasRole = cols?.some(r => r.name === 'role');
@@ -1001,6 +1088,15 @@ app.post('/users', requireAdmin, (req, res) => {
   const { username, password, role = 'user' } = req.body;
   if (!username || !password) return res.status(400).json({ message: 'Missing username/password' });
   const hash = bcrypt.hashSync(String(password), 10);
+  if (MONGO_READY) {
+    return mongoDb.collection('users').findOne({ username }).then(exists => {
+      if (exists) return res.status(409).json({ message: 'Username already exists' });
+      nextId('users').then(id => {
+        mongoDb.collection('users').insertOne({ id, username, password_hash: hash, role }).then(() => res.json({ id })).catch(e => res.status(500).json({ message: 'DB error', detail: e.message }));
+      });
+    }).catch(e => res.status(500).json({ message: 'DB error', detail: e.message }));
+  }
+  if (!SQLITE_READY) return res.status(500).json({ message: 'DB error', detail: 'SQLite disabled' });
   db.all(`PRAGMA table_info(users)`, [], (e, cols) => {
     if (e) return res.status(500).json({ message: 'DB error', detail: e.message });
     const hasUsername = cols?.some(r => r.name === 'username');
@@ -1032,6 +1128,10 @@ app.put('/users/:id/password', requireAdmin, (req, res) => {
   const { new_password } = req.body;
   if (!new_password) return res.status(400).json({ message: 'Missing new_password' });
   const hash = bcrypt.hashSync(String(new_password), 10);
+  if (MONGO_READY) {
+    return mongoDb.collection('users').updateOne({ id: Number(id) }, { $set: { password_hash: hash } }, { upsert: true }).then(() => res.json({ changed: 1 })).catch(e => res.status(500).json({ message: 'DB error', detail: e.message }));
+  }
+  if (!SQLITE_READY) return res.status(500).json({ message: 'DB error', detail: 'SQLite disabled' });
   db.run(`UPDATE users SET password_hash = ? WHERE id = ?`, [hash, id], function(err){
     if (err) return res.status(500).json({ message: 'DB error', detail: err.message });
     res.json({ changed: this.changes });
