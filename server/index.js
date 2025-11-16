@@ -765,6 +765,7 @@ function makeCrud(table) {
         .catch(err => res.status(500).json({ message: 'DB error', detail: err.message }));
     }
     const baseCols = table === 'staff' ? 'id, name, role, phone, note' : 'id, name, phone, address, note';
+    if (!SQLITE_READY) return res.status(500).json({ message: 'DB error', detail: 'SQLite disabled' });
     db.all(`SELECT ${baseCols} FROM ${table} ORDER BY name ASC, id ASC`, [], (err, rows) => {
       if (err) return res.status(500).json({ message: 'DB error', detail: err.message });
       res.json(rows);
@@ -773,6 +774,15 @@ function makeCrud(table) {
   app.post(`/${table}`, (req, res) => {
     const { name, phone, address, note, role } = req.body;
     if (!name) return res.status(400).json({ message: 'Missing name' });
+    if (MONGO_READY) {
+      return nextId(table).then(id => {
+        const doc = table === 'staff'
+          ? { id, name: name || '', role: role || null, phone: phone || '', note: note || '' }
+          : { id, name: name || '', phone: phone || '', address: address || '', note: note || '' };
+        mongoDb.collection(table).insertOne(doc).then(() => res.json({ id })).catch(e => res.status(500).json({ message: 'DB error', detail: e.message }));
+      }).catch(e => res.status(500).json({ message: 'DB error', detail: e.message }));
+    }
+    if (!SQLITE_READY) return res.status(500).json({ message: 'DB error', detail: 'SQLite disabled' });
     const cols = ['name','phone','address','note'];
     const vals = [name || '', phone || '', address || '', note || ''];
     if (table === 'staff') { cols.push('role'); vals.push(role || null); }
@@ -792,6 +802,18 @@ function makeCrud(table) {
   app.put(`/${table}/:id`, (req, res) => {
     const id = req.params.id;
     const { name, phone, address, note, role } = req.body;
+    if (MONGO_READY) {
+      const upd = {};
+      if (name != null) upd.name = name;
+      if (phone != null) upd.phone = phone;
+      if (address != null) upd.address = address;
+      if (note != null) upd.note = note;
+      if (table === 'staff' && role != null) upd.role = role;
+      return mongoDb.collection(table).updateOne({ id: Number(id) }, { $set: upd }, { upsert: true })
+        .then(() => res.json({ changed: 1 }))
+        .catch(e => res.status(500).json({ message: 'DB error', detail: e.message }));
+    }
+    if (!SQLITE_READY) return res.status(500).json({ message: 'DB error', detail: 'SQLite disabled' });
     const fields = []; const params = [];
     if (name != null) { fields.push('name = ?'); params.push(name); }
     if (phone != null) { fields.push('phone = ?'); params.push(phone); }
@@ -817,6 +839,12 @@ function makeCrud(table) {
   });
   app.delete(`/${table}/:id`, (req, res) => {
     const id = req.params.id;
+    if (MONGO_READY) {
+      return mongoDb.collection(table).deleteOne({ id: Number(id) })
+        .then(r => res.json({ deleted: r.deletedCount || 0 }))
+        .catch(e => res.status(500).json({ message: 'DB error', detail: e.message }));
+    }
+    if (!SQLITE_READY) return res.status(500).json({ message: 'DB error', detail: 'SQLite disabled' });
     db.run(`DELETE FROM ${table} WHERE id = ?`, [id], function(err){
       if (err) return res.status(500).json({ message: 'DB error', detail: err.message });
       if (MONGO_READY) mongoDb.collection(table).deleteOne({ id: Number(id) }).catch(() => {});
