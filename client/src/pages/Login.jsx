@@ -52,7 +52,7 @@ export default function Login({ onSuccess, onLogout }) {
         <button className="btn primary" type="submit">Đăng nhập</button>
         <button className="btn" type="button" onClick={onLogoutClick}>Đăng xuất</button>
       </form>
-      <div className="muted" style={{ marginTop: 8 }}></div>
+      
     </div>
   )
 }
