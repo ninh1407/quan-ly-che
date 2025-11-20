@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../api.js';
+import FilterBar from '../components/FilterBar.jsx';
 
 function useMonthYear() {
   const now = new Date();
@@ -8,8 +9,11 @@ function useMonthYear() {
   return { month, year, setMonth, setYear };
 }
 
+const fmtMoney = (v) => (Number(v) || 0).toLocaleString('vi-VN');
+
 export default function Dashboard() {
   const { month, year, setMonth, setYear } = useMonthYear();
+  const [selectedDay, setSelectedDay] = useState('all');
   const [sales, setSales] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [expenses, setExpenses] = useState([]);
@@ -19,6 +23,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [totals, setTotals] = useState({ totalSales: 0, totalPurchases: 0, totalExpenses: 0, netProfit: 0, variableCost: 0, fixedExpense: 0, variablePct: 0, fixedPct: 0, profitMarginPct: 0 });
+  const [tops, setTops] = useState({ buyers_top: [], suppliers_top: [] })
+  const [netByMonth, setNetByMonth] = useState([])
 
   const monthOptions = useMemo(() => Array.from({ length: 12 }, (_, i) => i + 1), []);
   const yearOptions = useMemo(() => {
@@ -33,14 +39,15 @@ export default function Dashboard() {
     const prevYear = month === 1 ? year - 1 : year;
     const prevParams = { month: prevMonth, year: prevYear };
     try {
-      const [aggRes, sRes, pRes, eRes, sPrevRes, pPrevRes, ePrevRes] = await Promise.allSettled([
+      const [aggRes, sRes, pRes, eRes, sPrevRes, pPrevRes, ePrevRes, statsRes] = await Promise.allSettled([
         api.get('/dashboard', { params }),
         api.get('/sales', { params }),
         api.get('/purchases', { params }),
         api.get('/expenses', { params }),
         api.get('/sales', { params: prevParams }),
         api.get('/purchases', { params: prevParams }),
-        api.get('/expenses', { params: prevParams })
+        api.get('/expenses', { params: prevParams }),
+        api.get('/stats', { params })
       ]);
 
       const salesData = sRes.status === 'fulfilled' ? (sRes.value.data || []) : [];
@@ -49,20 +56,30 @@ export default function Dashboard() {
       const prevSalesData = sPrevRes.status === 'fulfilled' ? (sPrevRes.value.data || []) : [];
       const prevPurchasesData = pPrevRes.status === 'fulfilled' ? (pPrevRes.value.data || []) : [];
       const prevExpensesData = ePrevRes.status === 'fulfilled' ? (ePrevRes.value.data || []) : [];
+      const statsData = statsRes.status === 'fulfilled' ? (statsRes.value.data || {}) : {}
 
-      setSales(salesData);
-      setPurchases(purchasesData);
-      setExpenses(expensesData);
+      let s = salesData, p = purchasesData, e = expensesData;
+      if (selectedDay !== 'all') {
+        const dd = String(selectedDay).padStart(2,'0');
+        const dateStr = `${year}-${String(month).padStart(2,'0')}-${dd}`;
+        s = s.filter(r => String(r.sale_date) === dateStr);
+        p = p.filter(r => String(r.purchase_date) === dateStr);
+        e = e.filter(r => String(r.expense_date) === dateStr);
+      }
+      setSales(s);
+      setPurchases(p);
+      setExpenses(e);
       setPrevSales(prevSalesData);
       setPrevPurchases(prevPurchasesData);
       setPrevExpenses(prevExpensesData);
+      setTops({ buyers_top: statsData.buyers_top || [], suppliers_top: statsData.suppliers_top || [] })
 
-      if (aggRes.status === 'fulfilled') {
+      if (aggRes.status === 'fulfilled' && selectedDay === 'all') {
         setTotals(aggRes.value.data || { totalSales: 0, totalPurchases: 0, totalExpenses: 0, netProfit: 0, variableCost: 0, fixedExpense: 0, variablePct: 0, fixedPct: 0, profitMarginPct: 0 });
       } else {
-        const fallbackSales = salesData.reduce((sum, r) => sum + (Number(r.total_amount) || 0), 0);
-        const fallbackPurchases = purchasesData.reduce((sum, r) => sum + (Number(r.total_cost) || 0), 0);
-        const fallbackExpenses = expensesData.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+        const fallbackSales = (selectedDay==='all' ? salesData : s).reduce((sum, r) => sum + (Number(r.total_amount) || 0), 0);
+        const fallbackPurchases = (selectedDay==='all' ? purchasesData : p).reduce((sum, r) => sum + (Number(r.total_cost) || 0), 0);
+        const fallbackExpenses = (selectedDay==='all' ? expensesData : e).reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
         setTotals({
           totalSales: fallbackSales,
           totalPurchases: fallbackPurchases,
@@ -82,16 +99,32 @@ export default function Dashboard() {
       if (coreErrors.length) {
         setError('Một số dữ liệu tải lỗi, đang hiển thị phần khả dụng');
       }
+      const months = Array.from({ length: 6 }, (_, i) => { const d = new Date(year, month - 1, 1); d.setMonth(d.getMonth() - i); return { m: d.getMonth()+1, y: d.getFullYear() } }).reverse()
+      const series = await Promise.all(months.map(mp => api.get('/dashboard', { params: { month: mp.m, year: mp.y } }).then(r => ({ m: mp.m, y: mp.y, sales: Number(r.data?.totalSales)||0, costs: (Number(r.data?.totalPurchases)||0) + (Number(r.data?.totalExpenses)||0) })).catch(() => ({ m: mp.m, y: mp.y, sales: 0, costs: 0 })) ))
+      setNetByMonth(series)
     } catch (e) {
       setError(e?.response?.data?.message || 'Tải dữ liệu tổng quan lỗi');
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, [month, year]);
+  useEffect(() => { load(); }, [month, year, selectedDay]);
+
+  useEffect(() => {
+    const dim = new Date(year, month, 0).getDate();
+    if (selectedDay !== 'all' && Number(selectedDay) > dim) {
+      setSelectedDay('all');
+    }
+  }, [month, year])
 
   const start = useMemo(() => new Date(year, month - 1, 1), [month, year]);
   const end = useMemo(() => new Date(year, month, 0), [month, year]);
-  const days = useMemo(() => Array.from({ length: end.getDate() }, (_, i) => new Date(year, month - 1, i + 1)), [end, month, year]);
+  const days = useMemo(() => {
+    if (selectedDay !== 'all') {
+      const d = new Date(year, month - 1, Number(selectedDay));
+      return [d];
+    }
+    return Array.from({ length: end.getDate() }, (_, i) => new Date(year, month - 1, i + 1));
+  }, [end, month, year, selectedDay]);
   const fmtLocalDate = (d) => {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -129,31 +162,64 @@ export default function Dashboard() {
   const costsByDay = useMemo(() => days.map((d, i) => ({ date: d.toISOString().slice(0, 10), total: (purchasesByDay[i]?.total || 0) + (expensesByDay[i]?.total || 0) })), [days, purchasesByDay, expensesByDay]);
   const maxSalesDay = Math.max(...salesByDay.map(x => x.total), 1);
   const maxCostsDay = Math.max(...costsByDay.map(x => x.total), 1);
+  const expenseCats = useMemo(() => {
+    const catMap = new Map();
+    (expenses||[]).forEach(e => { const k = e.category || 'Khác'; catMap.set(k, (catMap.get(k)||0) + (Number(e.amount)||0)) })
+    return Array.from(catMap.entries()).map(([name, amount]) => ({ name, amount }))
+  }, [expenses])
 
   const maxBar = Math.max(totalSales, totalCosts, 1);
   const barWidth = (v) => `${Math.round((v / maxBar) * 100)}%`;
   const miniBar = (v, max) => `${Math.round((v / Math.max(max, 1)) * 100)}%`;
 
+  const lineRef = React.useRef(null)
+  const doughnutRef = React.useRef(null)
+  const netMonthRef = React.useRef(null)
+  React.useEffect(() => {
+    let chartLine, chartD, chartNet
+    (async () => {
+      const { default: Chart } = await import('chart.js/auto')
+      const isMobile = (typeof window !== 'undefined' && window.innerWidth <= 768)
+      if (lineRef.current) {
+        const ctx = lineRef.current.getContext('2d')
+        const gradBlue = ctx.createLinearGradient(0,0,0,200); gradBlue.addColorStop(0,'rgba(37,99,235,.5)'); gradBlue.addColorStop(1,'rgba(37,99,235,.1)')
+        const gradRed = ctx.createLinearGradient(0,0,0,200); gradRed.addColorStop(0,'rgba(239,68,68,.5)'); gradRed.addColorStop(1,'rgba(239,68,68,.1)')
+        chartLine = new Chart(lineRef.current, {
+          type: 'line',
+          data: {
+            labels: days.map(d => fmtLocalDate(d)),
+            datasets: [
+              { label: 'Thu', data: salesByDay.map(x => x.total), borderColor: '#2563eb', backgroundColor: gradBlue, tension: .25, borderWidth: 2, fill:true },
+              { label: 'Chi', data: costsByDay.map(x => x.total), borderColor: '#ef4444', backgroundColor: gradRed, tension: .25, borderWidth: 2, fill:true }
+            ]
+          }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'bottom' }, tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${Number(ctx.parsed.y||0).toLocaleString()}` } } }, scales: { y: { beginAtZero: true, grid: { color:'rgba(0,0,0,.06)' } }, x:{ ticks: { autoSkip: true, maxTicksLimit: isMobile ? 5 : 10 }, grid:{ display:false } } } }
+        })
+      }
+      if (doughnutRef.current) {
+        chartD = new Chart(doughnutRef.current, {
+          type: 'doughnut', data: {
+            labels: ['Biến phí/DT', 'Định phí/DT', 'Biên lợi nhuận'],
+            datasets: [{ data: [Math.max(0, variablePct), Math.max(0, fixedPct), Math.max(0, profitMarginPct)], backgroundColor: ['#f59e0b','#6b7280','#22c55e'] }]
+          }, options: { plugins: { legend: { display: true } } }
+        })
+      }
+      if (netMonthRef.current && netByMonth.length) {
+        chartNet = new Chart(netMonthRef.current, { type:'line', data:{ labels: netByMonth.map(x => `${x.y}-${String(x.m).padStart(2,'0')}`), datasets:[{ label:'Thu (tháng)', data: netByMonth.map(x => x.sales||0), borderColor:'#2563eb', backgroundColor:'rgba(37,99,235,.15)', tension:.25, borderWidth:2, fill:true }, { label:'Chi (tháng)', data: netByMonth.map(x => x.costs||0), borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,.15)', tension:.25, borderWidth:2, fill:true }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:true, position:'bottom' } }, scales:{ y:{ beginAtZero:true }, x:{ ticks:{ autoSkip:true, maxTicksLimit:6 }, grid:{ display:false } } } } })
+      }
+      // bar chart cơ cấu chi phí theo nhóm
+      const cats = expenseCats.map(x => x.name)
+      const vals = expenseCats.map(x => x.amount)
+      const barEl = document.getElementById('chart-expense-bar')
+      if (barEl && cats.length) {
+        new Chart(barEl, { type:'bar', data:{ labels: cats, datasets:[{ label:'Chi phí theo nhóm', data: vals, backgroundColor:'#2563eb' }] }, options:{ plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true } } } })
+      }
+    })()
+    return () => { chartLine && chartLine.destroy(); chartD && chartD.destroy(); chartNet && chartNet.destroy() }
+  }, [month, year, salesByDay, costsByDay, variablePct, fixedPct, profitMarginPct, netByMonth])
+
   return (
     <div className="card">
-      {/* Header giống ảnh */}
-      <div style={{ background: '#3b7dbf', color: '#fff', padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ fontSize: 18, fontWeight: 700 }}>DASHBOARD TÀI CHÍNH CHÈ</div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <div>
-            <div className="muted" style={{ color: '#fff' }}>Tháng</div>
-            <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-              {monthOptions.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
-          </div>
-          <div>
-            <div className="muted" style={{ color: '#fff' }}>Năm</div>
-            <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
-              {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </div>
-        </div>
-      </div>
+      <FilterBar month={month} year={year} setMonth={setMonth} setYear={setYear} selectedDay={selectedDay} setSelectedDay={setSelectedDay} />
 
       {error && <div className="error" style={{ marginTop: 8 }}>{error}</div>}
 
@@ -188,26 +254,41 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Biểu đồ so sánh */}
-            <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div className="card">
-                <div className="muted" style={{ marginBottom: 6 }}>Tổng thu so với Tổng chi</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 8, alignItems: 'center' }}>
-                  <div>Thu</div>
-                  <div style={{ background: '#1976d2', height: 18, width: barWidth(totalSales) }} />
-                  <div>Chi</div>
-                  <div style={{ background: '#f57c00', height: 18, width: barWidth(totalCosts) }} />
-                </div>
+            {/* Widget gộp Thu–Chi–Lãi */}
+            <div className="card" style={{ marginTop:16 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
+                <div className="kpi"><div>💵 Tổng Thu</div><div className="kpi-value">{fmtMoney(totalSales)}</div></div>
+                <div className="kpi"><div>🧾 Tổng Chi</div><div className="kpi-value">{fmtMoney(totalCosts)}</div></div>
+                <div className="kpi"><div>📈 Lãi/Lỗ</div><div className="kpi-value" style={{ color: netProfit>=0?'#22c55e':'#ef4444' }}>{fmtMoney(netProfit)}</div></div>
               </div>
-              <div className="card">
-                <div className="muted" style={{ marginBottom: 6 }}>Tổng Lãi/Lỗ Tháng này và Tháng trước</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 8, alignItems: 'center' }}>
-                  <div>Tháng này</div>
-                  <div style={{ background: netProfit >= 0 ? '#2e7d32' : '#c62828', height: 18, width: miniBar(Math.abs(netProfit), Math.abs(netProfit) + Math.abs(prevNetProfit)) }} />
-                  <div>Tháng trước</div>
-                  <div style={{ background: prevNetProfit >= 0 ? '#2e7d32' : '#c62828', height: 18, width: miniBar(Math.abs(prevNetProfit), Math.abs(netProfit) + Math.abs(prevNetProfit)) }} />
-                </div>
+              <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:8, alignItems:'center', marginTop:12 }}>
+                <div>Thu</div><div style={{ background:'#2563eb', height:18, width: barWidth(totalSales), borderRadius:8 }} />
+                <div>Chi</div><div style={{ background:'#ef4444', height:18, width: barWidth(totalCosts), borderRadius:8 }} />
               </div>
+            </div>
+
+            {/* Biểu đồ Chart.js */}
+            <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+              <div className="card chart-card">
+                <div className="muted" style={{ marginBottom: 6 }}>Dòng tiền theo ngày (Chart.js)</div>
+                <canvas ref={lineRef} style={{ width:'100%', height:'200px' }} />
+              </div>
+              <div className="card chart-card">
+                <div className="muted" style={{ marginBottom: 6 }}>Tỷ lệ/DT (doughnut)</div>
+                <canvas ref={doughnutRef} style={{ width:'100%', height:'200px' }} />
+              </div>
+            </div>
+            <div className="card chart-card" style={{ marginTop:16 }}>
+              <div className="muted" style={{ marginBottom: 6 }}>Thu–Chi theo tháng</div>
+              <canvas ref={netMonthRef} style={{ width:'100%', height:'220px' }} />
+            </div>
+            <div className="card chart-card" style={{ marginTop:16 }}>
+              <div className="muted" style={{ marginBottom: 6 }}>Cơ cấu chi phí theo nhóm</div>
+              {expenseCats.length ? (
+                <canvas id="chart-expense-bar" style={{ width:'100%', height:'220px' }} />
+              ) : (
+                <div className="empty-state" style={{ marginTop:8 }}>Chưa có dữ liệu tháng {String(month).padStart(2,'0')}/{year}</div>
+              )}
             </div>
 
             {/* Tỷ lệ chi phí trên doanh thu */}
@@ -279,6 +360,24 @@ export default function Dashboard() {
                   <tr><td>Chi phí</td><td>{expenses.length}</td><td>{totalExpenses.toLocaleString()}</td></tr>
                 </tbody>
               </table>
+            </div>
+            <div style={{ marginTop:16, display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              <div className="card">
+                <div style={{ fontWeight:700, marginBottom:6 }}>Top 5 Khách hàng</div>
+                {((tops.buyers_top||[]).length===0) ? (
+                  <div className="empty-state" style={{ marginTop:8 }}>Chưa có dữ liệu tháng {String(month).padStart(2,'0')}/{year}</div>
+                ) : (
+                  <table className="table compact"><thead><tr><th>Tên</th><th className="num">Số vụ</th><th className="num">Kg</th><th className="num">Tổng</th></tr></thead><tbody>{(tops.buyers_top||[]).slice(0,5).map(r => (<tr key={r.name}><td title={r.name}>{r.name}</td><td className="num">{(Number(r.count)||0).toLocaleString()}</td><td className="num">{(Number(r.weight)||0).toLocaleString()}</td><td className="num">{fmtMoney(Number(r.amount)||0)} đ</td></tr>))}</tbody></table>
+                )}
+              </div>
+              <div className="card">
+                <div style={{ fontWeight:700, marginBottom:6 }}>Top 5 Nhà cung cấp</div>
+                {((tops.suppliers_top||[]).length===0) ? (
+                  <div className="empty-state" style={{ marginTop:8 }}>Chưa có dữ liệu tháng {String(month).padStart(2,'0')}/{year}</div>
+                ) : (
+                  <table className="table compact"><thead><tr><th>Tên</th><th className="num">Số vụ</th><th className="num">Kg</th><th className="num">Tổng</th></tr></thead><tbody>{(tops.suppliers_top||[]).slice(0,5).map(r => (<tr key={r.name}><td title={r.name}>{r.name}</td><td className="num">{(Number(r.count)||0).toLocaleString()}</td><td className="num">{(Number(r.weight)||0).toLocaleString()}</td><td className="num">{fmtMoney(Number(r.amount)||0)} đ</td></tr>))}</tbody></table>
+                )}
+              </div>
             </div>
           </div>
         )}

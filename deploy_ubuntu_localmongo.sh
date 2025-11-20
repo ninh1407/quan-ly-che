@@ -20,6 +20,7 @@ curl -fsSL https://pgp.mongodb.com/server-7.0.asc | gpg -o /usr/share/keyrings/m
 echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -sc)/mongodb-org/7.0 multiverse" > /etc/apt/sources.list.d/mongodb-org-7.0.list
 apt update
 apt -y install mongodb-org
+apt -y install mongodb-mongosh || true
 systemctl enable --now mongod
 
 pm2 kill || true
@@ -34,6 +35,8 @@ chown -R "${USERNAME}:${USERNAME}" /var/www/che-app || true
 
 cd "${PROJECT_ROOT}/server"
 npm ci || npm install
+ADMIN_HASH=$(node -e "console.log(require('bcryptjs').hashSync('admin123',10))")
+mongosh --quiet --eval "db.getSiblingDB('${MONGO_DB_NAME}').users.updateOne({ username: 'admin' }, { \$set: { id: 1, username: 'admin', password_hash: '${ADMIN_HASH}', role: 'admin' } }, { upsert: true })"
 
 cd "${PROJECT_ROOT}/client"
 rm -rf dist
@@ -75,4 +78,3 @@ pm2 startup systemd -u "${USERNAME}" --hp "/home/${USERNAME}"
 pm2 restart che-server --update-env
 
 curl -s http://127.0.0.1:4000/health || true
-

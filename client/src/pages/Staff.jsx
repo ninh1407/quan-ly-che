@@ -7,6 +7,7 @@ export default function Staff() {
   const [error, setError] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState({ name: '', role: 'creator', phone: '', note: '' })
+  const [query, setQuery] = useState('')
 
   const load = async () => {
     setLoading(true); setError('')
@@ -34,6 +35,10 @@ export default function Staff() {
   return (
     <div className="card">
       <h2>Người tạo phiếu / Bán hàng</h2>
+      <div className="section-bar" style={{ marginBottom: 8 }}>
+        <label>Lọc</label>
+        <input placeholder="Tên/Vai trò/ĐT/Ghi chú" value={query} onChange={(e) => setQuery(e.target.value)} />
+      </div>
       <form onSubmit={onSubmit} className="form">
         <label>Tên</label><input value={form.name} onChange={(e) => change('name', e.target.value)} />
         <label>Vai trò</label>
@@ -53,9 +58,12 @@ export default function Staff() {
           <table className="table">
             <thead><tr><th>Tên</th><th>Vai trò</th><th>ĐT</th><th>Ghi chú</th><th>Hành động</th></tr></thead>
             <tbody>
-              {list.map(r => (
+              {(query ? list.filter(r => {
+                const s = query.toLowerCase()
+                return [r.name, (r.role==='seller'?'Người bán hàng':'Người tạo phiếu'), r.phone, r.note].some(v => String(v||'').toLowerCase().includes(s))
+              }) : list).map(r => (
                 <tr key={r.id}>
-                  <td>{r.name}</td><td>{r.role}</td><td>{r.phone}</td><td>{r.note}</td>
+                  <td>{r.name}</td><td>{r.role==='seller' ? 'Người bán hàng' : 'Người tạo phiếu'}</td><td>{r.phone}</td><td>{r.note}</td>
                   <td>
                     <button className="btn" onClick={() => editRow(r)}>Sửa</button>
                     <button className="btn" style={{ marginLeft: 6 }} onClick={() => deleteRow(r.id)}>Xóa</button>
