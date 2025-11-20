@@ -45,17 +45,8 @@ export default function Season() {
     return Array.from({ length: 6 }, (_, i) => y - 3 + i);
   }, []);
 
-  // Khi chọn 3 tháng, chỉ cho phép các tháng bắt đầu 1/4/7/10
-  const seasonStartOptions = useMemo(() => {
-    return length === 3 ? [1, 4, 7, 10] : monthOptions;
-  }, [length, monthOptions]);
-
-  // Nếu đang chọn tháng không hợp lệ khi chuyển sang 3 tháng, tự động điều chỉnh
-  useEffect(() => {
-    if (length === 3 && !seasonStartOptions.includes(startMonth)) {
-      setStartMonth(seasonStartOptions[0]);
-    }
-  }, [length, seasonStartOptions, startMonth]);
+  // Cho phép chọn tháng bắt đầu 1–12 cho mọi độ dài đợt
+  const seasonStartOptions = useMemo(() => monthOptions, [monthOptions]);
 
   const load = async () => {
     setLoading(true); setError('');
@@ -353,11 +344,6 @@ export default function Season() {
         {supplierOptions.map(s => <option key={s} value={s} />)}
       </datalist>
 
-      {length === 3 && (
-        <div className="muted" style={{ marginTop: 4 }}>
-          Khi chọn 3 tháng, tháng bắt đầu chỉ có thể là 1, 4, 7 hoặc 10.
-        </div>
-      )}
 
       <div className="muted" style={{ marginTop: 6 }}>Đợt: {monthsLabel}</div>
       {error && <div className="error" style={{ marginTop: 8 }}>{error}</div>}

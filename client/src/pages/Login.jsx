@@ -24,23 +24,7 @@ export default function Login({ onSuccess, onLogout }) {
   const onLogin = async (e) => {
     e.preventDefault(); setError(''); setInfo('')
     try {
-      const isLocal = String(api.defaults?.baseURL || '').includes('localhost');
-      if (isLocal) {
-        const res = await api.post('/auth/login', { username, password })
-        const { token, roles, role } = res.data || {}
-        if (!token) throw new Error('No token')
-        localStorage.setItem('token', token)
-        if (Array.isArray(roles)) localStorage.setItem('roles', JSON.stringify(roles))
-        localStorage.setItem('role', (Array.isArray(roles) ? roles.join(',') : (role || 'user')))
-        localStorage.setItem('username', username)
-        setInfo(`Đăng nhập thành công: quyền ${(Array.isArray(roles)?roles.join(','): (role||'user'))}`)
-        if (typeof onSuccess === 'function') onSuccess()
-        return
-      }
-      const form = new URLSearchParams();
-      form.set('username', username);
-      form.set('password', password);
-      const res = await api.post('/auth/login', form, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
+      const res = await api.post('/auth/login', { username, password })
       const { token, roles, role } = res.data || {}
       if (!token) throw new Error('No token')
       localStorage.setItem('token', token)
