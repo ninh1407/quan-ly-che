@@ -18,10 +18,13 @@ try { if (!fs.existsSync('uploads_enc')) fs.mkdirSync('uploads_enc'); } catch {}
 
 let db = null;
 let SQLITE_READY = false;
+const SQLITE_SKIP = String(process.env.DISABLE_SQLITE||'').toLowerCase() === 'true' || String(process.env.DISABLE_SQLITE||'') === '1'
 try {
-  sqlite3 = require('sqlite3').verbose();
-  db = new sqlite3.Database('data.db');
-  SQLITE_READY = true;
+  if (!SQLITE_SKIP) {
+    sqlite3 = require('sqlite3').verbose();
+    db = new sqlite3.Database('data.db');
+    SQLITE_READY = true;
+  }
 } catch (e) {
   console.warn('SQLite disabled:', e.message);
 }
