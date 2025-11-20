@@ -1740,6 +1740,43 @@ app.get('/balance-sheet', requireAuth, async (req, res) => {
   }
 })
 
+app.post('/admin/migrate/sqlite-to-mongo', rateLimit(60_000, 5, 'migrate_sqlite_to_mongo'), requireAdmin, async (req, res) => {
+  try {
+    if (!SQLITE_READY) return res.status(400).json({ message: 'SQLite not available' })
+    if (!MONGO_READY) return res.status(400).json({ message: 'MongoDB not connected' })
+    const q = req.body || {}
+    const dry = !!q.dry_run
+    const getAll = (sql, params=[]) => new Promise((resolve) => db.all(sql, params, (e, rows) => resolve(e ? [] : rows)))
+    const tables = [
+      { name: 'users', sql: 'SELECT * FROM users', coll: 'users' },
+      { name: 'sales', sql: 'SELECT * FROM sales', coll: 'sales' },
+      { name: 'purchases', sql: 'SELECT * FROM purchases', coll: 'purchases' },
+      { name: 'expenses', sql: 'SELECT * FROM expenses', coll: 'expenses' },
+      { name: 'audit_logs', sql: 'SELECT * FROM audit_logs', coll: 'audit_logs' },
+      { name: 'security_logs', sql: 'SELECT * FROM security_logs', coll: 'security_logs' }
+    ]
+    const result = { migrated: {}, skipped: {}, total: {}, dry_run: dry }
+    for (const t of tables) {
+      const rows = await getAll(t.sql)
+      result.total[t.name] = rows.length
+      let mig = 0, skip = 0
+      if (!dry) {
+        for (const row of rows) {
+          try {
+            await mongoDb.collection(t.coll).updateOne({ id: Number(row.id) }, { $set: row }, { upsert: true })
+            mig++
+          } catch { skip++ }
+        }
+      }
+      result.migrated[t.name] = dry ? 0 : mig
+      result.skipped[t.name] = dry ? 0 : skip
+    }
+    res.json(result)
+  } catch (e) {
+    res.status(500).json({ message: 'Migration error', detail: e.message })
+  }
+})
+
 app.get('/health', (req, res) => {
   res.json({ ok: true, mongo: !!MONGO_READY });
 });
