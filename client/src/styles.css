@@ -1,4 +1,4 @@
-.container{max-width:1200px;margin:24px auto;padding:0 20px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--text)}
+.container{max-width:1280px;margin:24px auto;padding:0 20px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--text)}
 .tabs{margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:50}
 .nav-buttons{display:flex;gap:10px;flex-wrap:wrap}
 .hamburger-btn{padding:10px 12px;border:1px solid var(--border);background:var(--accent);border-radius:10px}
@@ -22,11 +22,12 @@ input[type="number"]{text-align:right}
 .card{overflow:hidden;max-width:100%;box-sizing:border-box}
 .table{min-width:560px;width:100%;border-collapse:separate;border-spacing:0;margin-top:14px}
 .table th,.table td{white-space:normal}
-.table th{background:#f1f5f9;color:var(--text);border-bottom:1px solid var(--border);padding:12px;text-align:left;height:48px}
-.table td{border-bottom:1px solid rgba(0,0,0,.06);padding:12px;color:var(--text);height:48px}
+.table{font-size:16px;line-height:1.5}
+.table th{background:#f1f5f9;color:var(--text);border-bottom:1px solid var(--border);padding:16px;text-align:left;height:auto}
+.table td{border-bottom:1px solid rgba(0,0,0,.06);padding:16px;color:var(--text);height:auto}
 .table tbody tr:hover{background:#f8fafc}
 .table td.num, .table th.num{ text-align:right; font-variant-numeric:tabular-nums }
-.table.compact th, .table.compact td{ padding:8px; font-size:14px }
+.table.compact th, .table.compact td{ padding:12px; font-size:15px }
 .table.compact td:first-child{ max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .pill{display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:var(--accent);color:var(--text)}
 .pill.pending{background:var(--pill-pending-bg);border-color:var(--pill-pending-border);color:var(--pill-pending-text)}
