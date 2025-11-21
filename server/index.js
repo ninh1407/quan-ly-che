@@ -2127,6 +2127,8 @@ function requireAdmin(req, res, next) {
   });
 }
 
+//
+
 // Seed endpoint (local use)
 app.get('/seed', async (req, res) => {
   if (!MONGO_READY) return res.status(500).json({ message: 'Mongo not connected' });
@@ -2646,3 +2648,4 @@ function broadcastEvent(event, data) {
     sseClients.forEach(c => { try { c.res.write(payload) } catch {} })
   } catch {}
 }
+// (license feature removed)

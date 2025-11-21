@@ -12,8 +12,6 @@ function useMonthYear() {
 
 export default function BalanceSheet() {
   const { month, year, setMonth, setYear } = useMonthYear()
-  const [selectedDay, setSelectedDay] = useState('all')
-  const [selectedDate, setSelectedDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [data, setData] = useState({
@@ -52,7 +50,7 @@ export default function BalanceSheet() {
     try {
       const paramsPending = { month, year, payment_status: 'pending' }
       const paramsAll = { month, year }
-      const [rsPending, rpPending, rsAll, rpAll, rexpAll, dash, rsAllGlobal, rpAllGlobal, rexpAllGlobal, rfgAll, rfgAllGlobal] = await Promise.all([
+      const [rsPending, rpPending, rsAll, rpAll, rexpAll, dash, rsAllGlobal, rpAllGlobal, rexpAllGlobal] = await Promise.all([
         api.get('/sales', { params: paramsPending }),
         api.get('/purchases', { params: paramsPending }),
         api.get('/sales', { params: paramsAll }),
@@ -62,62 +60,33 @@ export default function BalanceSheet() {
         api.get('/sales'),
         api.get('/purchases'),
         api.get('/expenses'),
-        api.get('/finished-stock', { params: paramsAll }),
-        api.get('/finished-stock'),
       ])
-      let salesAll = rsAll.data||[]
-      let purchAll = rpAll.data||[]
-      let expAll = rexpAll.data||[]
-      let pendSales = rsPending.data||[]
-      let pendPurch = rpPending.data||[]
-      if (selectedDay !== 'all') {
-        const dd = String(selectedDay).padStart(2,'0')
-        const dateStr = `${year}-${String(month).padStart(2,'0')}-${dd}`
-        salesAll = salesAll.filter(r => String(r.sale_date) === dateStr)
-        purchAll = purchAll.filter(r => String(r.purchase_date) === dateStr)
-        expAll = expAll.filter(r => String(r.expense_date) === dateStr)
-        pendSales = pendSales.filter(r => String(r.sale_date) === dateStr)
-        pendPurch = pendPurch.filter(r => String(r.purchase_date) === dateStr)
-        const fgAllDay = (rfgAll.data||[]).filter(r => String(r.entry_date) === dateStr)
-        rfgAll.data = fgAllDay
-      }
-      const receivables = pendSales.reduce((s, r) => s + Number(r.total_amount != null ? r.total_amount : (Number(r.price_per_kg||0) * Number(r.weight||0))), 0)
-      const payables = pendPurch.reduce((s, r) => s + Number(r.total_cost != null ? r.total_cost : (Number(r.unit_price||0) * Number((r.net_weight ?? r.weight) || 0))), 0)
+      const receivables = (rsPending.data||[]).reduce((s, r) => s + Number(r.total_amount != null ? r.total_amount : (Number(r.price_per_kg||0) * Number(r.weight||0))), 0)
+      const payables = (rpPending.data||[]).reduce((s, r) => s + Number(r.total_cost != null ? r.total_cost : (Number(r.unit_price||0) * Number((r.net_weight ?? r.weight) || 0))), 0)
+      const salesAll = rsAll.data||[]
+      const purchAll = rpAll.data||[]
+      const expAll = rexpAll.data||[]
       const salesWeight = salesAll.reduce((s, r) => s + Number(r.weight||0), 0)
-      const finishedIn = (rfgAll.data||[]).reduce((s, r) => s + Number(r.weight||0), 0)
-      const useFinished = finishedIn > 0
       const purchasesNet = purchAll.reduce((s, r) => s + Number((r.net_weight ?? r.weight) || 0), 0)
-      const baseIn = useFinished ? finishedIn : purchasesNet
-      const inventoryWeight = Math.max(0, baseIn - salesWeight)
+      const inventoryWeight = Math.max(0, purchasesNet - salesWeight)
       const totalPurchValue = purchAll.reduce((s, r) => s + Number(r.total_cost != null ? r.total_cost : (Number(r.unit_price||0) * Number((r.net_weight ?? r.weight) || 0))), 0)
-      const refDate = new Date(`${String(year)}-${String(month).padStart(2,'0')}-${selectedDay==='all'?'28':String(selectedDay).padStart(2,'0')}`)
+      const refDate = new Date(`${String(year)}-${String(month).padStart(2,'0')}-28`)
       const windowDays = valuationMethod==='7d_avg' ? 7 : (valuationMethod==='30d_avg' ? 30 : null)
       let avgUnitCost = 0
       if (windowDays != null) {
         const since = new Date(refDate.getTime() - windowDays*24*3600*1000)
-        const items = useFinished
-          ? (rfgAllGlobal.data||[]).filter(r => { const d = new Date(r.entry_date); return d >= since && d <= refDate })
-          : (rpAllGlobal.data||[]).filter(r => { const d = new Date(r.purchase_date); return d >= since && d <= refDate })
-        const sum = useFinished
-          ? items.reduce((s,r)=> s + Number(r.unit_cost||0) * Number(r.weight||0), 0)
-          : items.reduce((s,r)=> s + Number(r.unit_price||0) * Number((r.net_weight ?? r.weight) || 0), 0)
-        const wsum = useFinished
-          ? items.reduce((s,r)=> s + Number(r.weight||0), 0)
-          : items.reduce((s,r)=> s + Number((r.net_weight ?? r.weight) || 0), 0)
+        const items = (rpAllGlobal.data||[]).filter(r => { const d = new Date(r.purchase_date); return d >= since && d <= refDate })
+        const sum = items.reduce((s,r)=> s + Number(r.unit_price||0) * Number((r.net_weight ?? r.weight) || 0), 0)
+        const wsum = items.reduce((s,r)=> s + Number((r.net_weight ?? r.weight) || 0), 0)
         avgUnitCost = wsum>0 ? (sum/wsum) : 0
       } else {
-        if (useFinished) {
-          const fgVal = (rfgAll.data||[]).reduce((s,r)=> s + Number(r.unit_cost||0) * Number(r.weight||0), 0)
-          avgUnitCost = finishedIn > 0 ? (fgVal / finishedIn) : 0
-        } else {
-          avgUnitCost = purchasesNet > 0 ? (totalPurchValue / purchasesNet) : 0
-        }
+        avgUnitCost = purchasesNet > 0 ? (totalPurchValue / purchasesNet) : 0
       }
       const inventoryValue = Math.round(avgUnitCost * inventoryWeight)
       const netProfit = Number(dash.data?.netProfit || 0)
       const paidSales = salesAll.filter(r => String(r.payment_status)==='paid').reduce((s,r)=> s + Number(r.total_amount != null ? r.total_amount : (Number(r.price_per_kg||0)*Number(r.weight||0))), 0)
       const paidPurchases = purchAll.filter(r => String(r.payment_status)==='paid').reduce((s,r)=> s + Number(r.total_cost != null ? r.total_cost : (Number(r.unit_price||0)*Number((r.net_weight ?? r.weight) || 0))), 0)
-      const paidExpenses = expAll.reduce((s, r) => s + Number(r.amount||0), 0)
+      const paidExpenses = expAll.reduce((s, r) => s + Number(r.amount||0), 0) // giả định chi phí đã chi
       const cashflowNet = paidSales - paidPurchases - paidExpenses
       const salesGlobal = rsAllGlobal.data||[]
       const purchGlobal = rpAllGlobal.data||[]
@@ -132,14 +101,14 @@ export default function BalanceSheet() {
       const now = new Date()
       const daysDiff = (d) => Math.floor((now.getTime() - new Date(d).getTime())/(24*3600*1000))
       const receivablesByAging = { in7:0, in30:0, over30:0 }
-      ;(pendSales||[]).forEach(r => { const dd = daysDiff(r.sale_date); const val = Number(r.total_amount != null ? r.total_amount : (Number(r.price_per_kg||0)*Number(r.weight||0))); if (dd <= 7) receivablesByAging.in7 += val; else if (dd <= 30) receivablesByAging.in30 += val; else receivablesByAging.over30 += val })
+      ;(rsPending.data||[]).forEach(r => { const dd = daysDiff(r.sale_date); const val = Number(r.total_amount != null ? r.total_amount : (Number(r.price_per_kg||0)*Number(r.weight||0))); if (dd <= 7) receivablesByAging.in7 += val; else if (dd <= 30) receivablesByAging.in30 += val; else receivablesByAging.over30 += val })
       const receivablesByCustomerMap = new Map()
-      ;(pendSales||[]).forEach(r => { const k = String(r.customer_name||''); const v = Number(r.total_amount != null ? r.total_amount : (Number(r.price_per_kg||0)*Number(r.weight||0))); receivablesByCustomerMap.set(k, (receivablesByCustomerMap.get(k)||0)+v) })
+      ;(rsPending.data||[]).forEach(r => { const k = String(r.customer_name||''); const v = Number(r.total_amount != null ? r.total_amount : (Number(r.price_per_kg||0)*Number(r.weight||0))); receivablesByCustomerMap.set(k, (receivablesByCustomerMap.get(k)||0)+v) })
       const receivablesByCustomer = Array.from(receivablesByCustomerMap.entries()).map(([name,amount])=>({ name, amount }))
       const payablesByAging = { in7:0, in30:0, over30:0 }
-      ;(pendPurch||[]).forEach(r => { const dd = daysDiff(r.purchase_date); const val = Number(r.total_cost != null ? r.total_cost : (Number(r.unit_price||0)*Number((r.net_weight ?? r.weight) || 0))); if (dd <= 7) payablesByAging.in7 += val; else if (dd <= 30) payablesByAging.in30 += val; else payablesByAging.over30 += val })
+      ;(rpPending.data||[]).forEach(r => { const dd = daysDiff(r.purchase_date); const val = Number(r.total_cost != null ? r.total_cost : (Number(r.unit_price||0)*Number((r.net_weight ?? r.weight) || 0))); if (dd <= 7) payablesByAging.in7 += val; else if (dd <= 30) payablesByAging.in30 += val; else payablesByAging.over30 += val })
       const payablesBySupplierMap = new Map()
-      ;(pendPurch||[]).forEach(r => { const k = String(r.supplier_name||''); const v = Number(r.total_cost != null ? r.total_cost : (Number(r.unit_price||0)*Number((r.net_weight ?? r.weight) || 0))); payablesBySupplierMap.set(k, (payablesBySupplierMap.get(k)||0)+v) })
+      ;(rpPending.data||[]).forEach(r => { const k = String(r.supplier_name||''); const v = Number(r.total_cost != null ? r.total_cost : (Number(r.unit_price||0)*Number((r.net_weight ?? r.weight) || 0))); payablesBySupplierMap.set(k, (payablesBySupplierMap.get(k)||0)+v) })
       const payablesBySupplier = Array.from(payablesBySupplierMap.entries()).map(([name,amount])=>({ name, amount }))
       const pendingCosts = (expAll||[]).filter(r => !r.receipt_path).reduce((s,r)=> s + Number(r.amount||0), 0)
       const cumulativeProfit = salesGlobal.reduce((s,r)=> s + Number(r.total_amount != null ? r.total_amount : (Number(r.price_per_kg||0)*Number(r.weight||0))), 0) - purchGlobal.reduce((s,r)=> s + Number(r.total_cost != null ? r.total_cost : (Number(r.unit_price||0)*Number((r.net_weight ?? r.weight) || 0))), 0) - expGlobal.reduce((s,r)=> s + Number(r.amount||0), 0)
@@ -156,13 +125,7 @@ export default function BalanceSheet() {
     }
   }
 
-  useEffect(() => { load() }, [month, year, selectedDay])
-  useEffect(() => {
-    const dim = new Date(year, month, 0).getDate()
-    if (selectedDay !== 'all' && Number(selectedDay) > dim) {
-      setSelectedDay('all')
-    }
-  }, [month, year])
+  useEffect(() => { load() }, [month, year])
 
   const assetsTotal = Number(data.receivables||0) + Number(data.inventoryValue||0) + Math.max(0, Number(data.cashflowNet||0)) + Number(data.prepaidExpenses||0)
   const liabilitiesTotal = Number(data.payables||0)
@@ -172,7 +135,7 @@ export default function BalanceSheet() {
   return (
     <div className="card">
       <h2>Bảng cân đối kế toán</h2>
-      <div className="section-bar filter-grid">
+      <div className="section-bar" style={{ display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
         <div className="inline" style={{ display:'flex', gap:6, alignItems:'center' }}>
           <span>Tháng</span>
           <select value={month} onChange={(e) => setMonth(Number(e.target.value))} style={{ width:110 }}>
@@ -185,23 +148,8 @@ export default function BalanceSheet() {
             {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
-        <div className="inline" style={{ display:'flex', gap:6, alignItems:'center' }}>
-          <span>Ngày</span>
-          <select value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)} style={{ width:110 }}>
-            <option value="all">Tất cả</option>
-            {Array.from({ length: new Date(year, month, 0).getDate() }, (_, i) => i + 1).map(d => (<option key={d} value={String(d)}>{d}</option>))}
-          </select>
-        </div>
-        <div className="inline" style={{ display:'flex', gap:6, alignItems:'center' }}>
-          <span>Chọn ngày</span>
-          <input type="date" style={{ width:160 }} value={selectedDate} onChange={(e)=> {
-            const v = String(e.target.value||'')
-            setSelectedDate(v)
-            const d = new Date(v)
-            if (!isNaN(d.getTime())) { setYear(d.getFullYear()); setMonth(d.getMonth()+1); setSelectedDay(String(d.getDate())) }
-          }} />
-        </div>
-        <div className="inline" style={{ display:'flex', gap:6, alignItems:'center' }}>
+        {error && <div className="error">{error}</div>}
+        <div className="inline" style={{ display:'flex', gap:6, alignItems:'center', marginLeft:'auto' }}>
           <span>Định giá tồn</span>
           <select value={valuationMethod} onChange={(e)=> { setValuationMethod(e.target.value); localStorage.setItem('valuationMethod', e.target.value); load() }}>
             <option value="month_avg">TB tháng</option>
@@ -214,12 +162,11 @@ export default function BalanceSheet() {
           <input type="number" value={initialCapital} onChange={(e)=> { const v = Number(e.target.value||0); setInitialCapital(v); try { localStorage.setItem('initialCapital', String(v)) } catch {} }} />
         </div>
       </div>
-      {error && <div className="error" style={{ marginTop: 8 }}>{error}</div>}
 
       {loading ? (
         <div className="table-wrap">Đang tải...</div>
       ) : (
-        <div className="grid-2" style={{ marginTop:12 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
           <div className="card">
             <div style={{ fontWeight:700, marginBottom:6 }}>Tài sản</div>
             <div className="table-wrap">
@@ -227,7 +174,7 @@ export default function BalanceSheet() {
                 <thead><tr><th>Mục</th><th className="num">Giá trị</th></tr></thead>
                 <tbody>
                   <tr><td>Phải thu</td><td className="num">{fmtMoney(data.receivables)}</td></tr>
-                  <tr><td>Tồn kho thành phẩm</td><td className="num">{fmtMoney(data.inventoryValue)}</td></tr>
+                  <tr><td>Hàng tồn (ước tính)</td><td className="num">{fmtMoney(data.inventoryValue)}</td></tr>
                   <tr><td>Tiền mặt (ước tính)</td><td className="num">{fmtMoney(Math.max(0, data.cashflowNet))}</td></tr>
                   <tr><td>Chi phí trả trước</td><td className="num">{fmtMoney(data.prepaidExpenses)}</td></tr>
                   <tr style={{ fontWeight:700 }}><td>Tổng tài sản</td><td className="num">{fmtMoney(assetsTotal)}</td></tr>
@@ -261,7 +208,7 @@ export default function BalanceSheet() {
         </div>
       )}
 
-      <div className="grid-2" style={{ marginTop:12 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:12 }}>
         <div className="card">
           <div style={{ fontWeight:700, marginBottom:6 }}>Aging Phải thu</div>
           <div className="table-wrap">
@@ -270,7 +217,7 @@ export default function BalanceSheet() {
               <tbody>
                 <tr><td>Trong hạn ≤ 7 ngày</td><td className="num">{fmtMoney(data.receivablesByAging.in7)}</td></tr>
                 <tr><td>≤ 30 ngày</td><td className="num">{fmtMoney(data.receivablesByAging.in30)}</td></tr>
-                <tr><td>&gt; 30 ngày</td><td className="num">{fmtMoney(data.receivablesByAging.over30)}</td></tr>
+                <tr><td>> 30 ngày</td><td className="num">{fmtMoney(data.receivablesByAging.over30)}</td></tr>
               </tbody>
             </table>
             <div className="table-wrap" style={{ marginTop:8 }}>
@@ -291,7 +238,7 @@ export default function BalanceSheet() {
               <tbody>
                 <tr><td>Trong hạn ≤ 7 ngày</td><td className="num">{fmtMoney(data.payablesByAging.in7)}</td></tr>
                 <tr><td>≤ 30 ngày</td><td className="num">{fmtMoney(data.payablesByAging.in30)}</td></tr>
-                <tr><td>&gt; 30 ngày</td><td className="num">{fmtMoney(data.payablesByAging.over30)}</td></tr>
+                <tr><td>> 30 ngày</td><td className="num">{fmtMoney(data.payablesByAging.over30)}</td></tr>
               </tbody>
             </table>
             <div className="table-wrap" style={{ marginTop:8 }}>
