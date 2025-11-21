@@ -18,12 +18,14 @@ try { if (!fs.existsSync('uploads_enc')) fs.mkdirSync('uploads_enc'); } catch {}
 
 let db = null;
 let SQLITE_READY = false;
+const dbPath = process.env.DB_PATH || path.join(__dirname, 'data.db');
 const SQLITE_SKIP = String(process.env.DISABLE_SQLITE||'').toLowerCase() === 'true' || String(process.env.DISABLE_SQLITE||'') === '1'
 try {
   if (!SQLITE_SKIP) {
     sqlite3 = require('sqlite3').verbose();
-    db = new sqlite3.Database('data.db');
+    db = new sqlite3.Database(dbPath);
     SQLITE_READY = true;
+    console.log('SQLite connected to:', dbPath);
   }
 } catch (e) {
   console.warn('SQLite disabled:', e.message);
@@ -36,7 +38,10 @@ if (SQLITE_READY) {
 }
 
 function ensureBackupDir() {
-  try { if (!fs.existsSync('backups')) fs.mkdirSync('backups') } catch {}
+  try { 
+    const backupsDir = path.join(__dirname, 'backups');
+    if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir) 
+  } catch {}
 }
 function timestamp() {
   const d = new Date();
@@ -68,25 +73,28 @@ function pruneBackupsByDays(days) {
 function backupSqliteNow() {
   ensureBackupDir();
   const name = `sqlite-${timestamp()}.db`;
-  const src = 'data.db'; const dest = `backups/${name}`;
+  const backupsDir = path.join(__dirname, 'backups');
+  const src = dbPath; const dest = path.join(backupsDir, name);
   fs.copyFileSync(src, dest);
   pruneBackupsByDays(3);
   return name;
 }
-function listBackups() {
+function backupSqliteList() {
   ensureBackupDir();
-  return fs.readdirSync('backups').filter(f => f.endsWith('.db')).sort((a,b)=> b.localeCompare(a));
+  const backupsDir = path.join(__dirname, 'backups');
+  return fs.readdirSync(backupsDir).filter(f => f.endsWith('.db')).sort((a,b)=> b.localeCompare(a));
 }
 function restoreSqlite(name, cb) {
   try {
-    const src = `backups/${name}`;
+    const backupsDir = path.join(__dirname, 'backups');
+    const src = path.join(backupsDir, name);
     if (!fs.existsSync(src)) return cb(new Error('Backup not found'));
     if (SQLITE_READY) {
       try { db.close(); } catch {}
     }
-    fs.copyFileSync(src, 'data.db');
+    fs.copyFileSync(src, dbPath);
     if (SQLITE_READY) {
-      db = new sqlite3.Database('data.db');
+      db = new sqlite3.Database(dbPath);
       db.exec('PRAGMA journal_mode = WAL');
       db.exec('PRAGMA busy_timeout = 3000');
     }
@@ -102,6 +110,7 @@ let MONGO_READY = false;
 let mongoDb = null;
 let MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017';
 let MONGO_DB_NAME = process.env.MONGO_DB_NAME || 'quanlyche';
+const MONGO_SKIP = String(process.env.DISABLE_MONGO||'').toLowerCase() === 'true' || String(process.env.DISABLE_MONGO||'') === '1';
 try {
   if (!process.env.MONGO_URL && fs.existsSync('mongo.url.txt')) {
     const u = fs.readFileSync('mongo.url.txt', 'utf8').trim();
@@ -182,25 +191,29 @@ function rateLimit(windowMs, max, bucket) {
     next();
   }
 }
-try {
-  const client = new MongoClient(MONGO_URL, { serverSelectionTimeoutMS: 2000 });
-  client.connect().then(() => {
-    mongoDb = client.db(MONGO_DB_NAME);
-    MONGO_READY = true;
-    console.log('Mongo connected:', MONGO_URL, MONGO_DB_NAME);
-    mongoDb.collection('users').findOne({ username: 'admin' }).then(u => {
-      if (!u) {
-        nextId('users').then(id => {
-          const hash = bcrypt.hashSync('admin123', 10);
-          mongoDb.collection('users').insertOne({ id, username: 'admin', password_hash: hash, role: 'admin' }).catch(() => {});
-        });
-      }
-    }).catch(() => {});
-  }).catch((e) => {
-    console.warn('Mongo disabled:', e.message);
-  });
-} catch (e) {
-  console.warn('Mongo init error:', e.message);
+if (!MONGO_SKIP) {
+  try {
+    const client = new MongoClient(MONGO_URL, { serverSelectionTimeoutMS: 2000 });
+    client.connect().then(() => {
+      mongoDb = client.db(MONGO_DB_NAME);
+      MONGO_READY = true;
+      console.log('Mongo connected:', MONGO_URL, MONGO_DB_NAME);
+      mongoDb.collection('users').findOne({ username: 'admin' }).then(u => {
+        if (!u) {
+          nextId('users').then(id => {
+            const hash = bcrypt.hashSync('admin123', 10);
+            mongoDb.collection('users').insertOne({ id, username: 'admin', password_hash: hash, role: 'admin' }).catch(() => {});
+          });
+        }
+      }).catch(() => {});
+    }).catch((e) => {
+      console.warn('Mongo disabled:', e.message);
+    });
+  } catch (e) {
+    console.warn('Mongo init error:', e.message);
+  }
+} else {
+  console.log('Mongo skipped: DISABLE_MONGO is set');
 }
 
 // Create tables if not exist

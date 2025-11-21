@@ -32,6 +32,8 @@ export default function Season() {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
+  const [failedMonths, setFailedMonths] = useState([]);
   // Bộ lọc
   const [teaTypeFilter, setTeaTypeFilter] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
@@ -49,20 +51,32 @@ export default function Season() {
   const seasonStartOptions = useMemo(() => monthOptions, [monthOptions]);
 
   const load = async () => {
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setWarning(''); setFailedMonths([]);
     try {
-      // Fetch per month then merge
+      // Fetch per month then merge; chịu lỗi từng tháng
       const salesPromises = seasonMonths.map(({ month, year }) => api.get('/sales', { params: { month, year } }));
       const purchasePromises = seasonMonths.map(({ month, year }) => api.get('/purchases', { params: { month, year } }));
       const expensePromises = seasonMonths.map(({ month, year }) => api.get('/expenses', { params: { month, year } }));
       const [sResList, pResList, eResList] = await Promise.all([
-        Promise.all(salesPromises),
-        Promise.all(purchasePromises),
-        Promise.all(expensePromises)
+        Promise.allSettled(salesPromises),
+        Promise.allSettled(purchasePromises),
+        Promise.allSettled(expensePromises)
       ]);
-      setSales(sResList.flatMap(r => r.data || []));
-      setPurchases(pResList.flatMap(r => r.data || []));
-      setExpenses(eResList.flatMap(r => r.data || []));
+      const sOk = sResList.filter(r => r.status === 'fulfilled').flatMap(r => r.value.data || []);
+      const pOk = pResList.filter(r => r.status === 'fulfilled').flatMap(r => r.value.data || []);
+      const eOk = eResList.filter(r => r.status === 'fulfilled').flatMap(r => r.value.data || []);
+      setSales(sOk);
+      setPurchases(pOk);
+      setExpenses(eOk);
+      const anyReject = [sResList, pResList, eResList].some(list => list.some(r => r.status === 'rejected'));
+      if (anyReject) {
+        setWarning('Một số tháng thiếu dữ liệu, đã bỏ qua tháng lỗi');
+        const fails = new Set();
+        sResList.forEach((r, i) => { if (r.status === 'rejected') { const m = seasonMonths[i]; fails.add(`${String(m.month).padStart(2,'0')}/${m.year}`) } });
+        pResList.forEach((r, i) => { if (r.status === 'rejected') { const m = seasonMonths[i]; fails.add(`${String(m.month).padStart(2,'0')}/${m.year}`) } });
+        eResList.forEach((r, i) => { if (r.status === 'rejected') { const m = seasonMonths[i]; fails.add(`${String(m.month).padStart(2,'0')}/${m.year}`) } });
+        setFailedMonths(Array.from(fails));
+      }
     } catch (e) {
       setError(e?.response?.data?.message || 'Tải dữ liệu theo đợt lỗi');
     } finally { setLoading(false); }
@@ -346,6 +360,10 @@ export default function Season() {
 
 
       <div className="muted" style={{ marginTop: 6 }}>Đợt: {monthsLabel}</div>
+      {warning && failedMonths.length>0 && (
+        <div className="muted" style={{ marginTop: 4 }}>Thiếu dữ liệu tháng: {failedMonths.join(', ')}</div>
+      )}
+      {warning && <div className="muted" style={{ marginTop: 8 }}>{warning}</div>}
       {error && <div className="error" style={{ marginTop: 8 }}>{error}</div>}
 
       <div className="card" style={{ marginTop: 12 }}>

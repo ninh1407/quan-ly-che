@@ -1,7 +1,15 @@
 import axios from 'axios';
 
-const envBase = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE ? import.meta.env.VITE_API_BASE : null;
-const baseURL = envBase || 'http://20.205.30.184:8080';
+const envBase = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE) ? import.meta.env.VITE_API_BASE : null;
+let baseURL = envBase || null;
+if (!baseURL) {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname || 'localhost';
+    baseURL = `${window.location.protocol}//${host}:4000`;
+  } else {
+    baseURL = 'http://localhost:4000';
+  }
+}
 const api = axios.create({ baseURL });
 
 api.interceptors.request.use((config) => {
