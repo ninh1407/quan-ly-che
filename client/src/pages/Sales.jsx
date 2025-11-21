@@ -33,9 +33,11 @@ export default function Sales() {
   const [range, setRange] = useState({ from: '', to: '' });
   const [page, setPage] = useState(1); const pageSize = 10;
   const [sort, setSort] = useState({ key: 'sale_date', asc: true });
-  const serverOrigin = (api.defaults && api.defaults.baseURL && api.defaults.baseURL.startsWith('http')) ? api.defaults.baseURL : (typeof window !== 'undefined' ? window.location.origin : '');
+  const apiBase = (api.defaults && api.defaults.baseURL) ? api.defaults.baseURL : '';
+  const origin = (typeof window !== 'undefined') ? window.location.origin : '';
+  const base = apiBase.startsWith('http') ? apiBase : origin + (apiBase || '');
   const token = (typeof window !== 'undefined') ? (localStorage.getItem('token')||'') : '';
-  const receiptEndpoint = (type, id) => { try { return new URL(`/${type}/${id}/receipt?t=${encodeURIComponent(token)}`, serverOrigin).href } catch { return `/${type}/${id}/receipt?t=${encodeURIComponent(token)}` } }
+  const receiptEndpoint = (type, id) => `${String(base).replace(/\/$/,'')}/${type}/${id}/receipt?t=${encodeURIComponent(token)}`
   const STATUS_LABELS = { pending: 'Chờ', paid: 'Đã thanh toán' }
   const COUNTRY_CODES = [
     'AF','AL','DZ','AD','AO','AG','AR','AM','AU','AT','AZ',
