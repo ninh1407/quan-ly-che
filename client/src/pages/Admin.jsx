@@ -85,10 +85,10 @@ export default function Admin() {
 
   return (
     <div className="card">
-      <h2>Quản trị – Quản lý Quyền</h2>
+      <h2>Quản trị – Quản lý quyền</h2>
       <form onSubmit={onSubmit} className="form">
-        <label>Username</label><input value={form.username} onChange={(e) => change('username', e.target.value)} />
-        <label>Password</label><input type="password" value={form.password} onChange={(e) => change('password', e.target.value)} />
+        <label>Tên đăng nhập</label><input value={form.username} onChange={(e) => change('username', e.target.value)} />
+        <label>Mật khẩu</label><input type="password" value={form.password} onChange={(e) => change('password', e.target.value)} />
         <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
           <label style={{ display:'inline-flex', alignItems:'center', gap:6 }}><input type="checkbox" checked={form.roles.includes('seller')} onChange={(e)=> change('roles', e.target.checked ? [...new Set([...(form.roles||[]),'seller'])] : (form.roles||[]).filter(x=>x!=='seller'))} /> Nhân viên bán hàng</label>
           <label style={{ display:'inline-flex', alignItems:'center', gap:6 }}><input type="checkbox" checked={form.roles.includes('warehouse')} onChange={(e)=> change('roles', e.target.checked ? [...new Set([...(form.roles||[]),'warehouse'])] : (form.roles||[]).filter(x=>x!=='warehouse'))} /> Nhân viên kho</label>
@@ -102,7 +102,7 @@ export default function Admin() {
       <div style={{ marginTop: 16 }}>
         {loading ? 'Đang tải...' : (
           <table className="table">
-            <thead><tr><th>Username</th><th>Roles</th><th>Hành động</th></tr></thead>
+            <thead><tr><th>Tên đăng nhập</th><th>Vai trò</th><th>Hành động</th></tr></thead>
             <tbody>
               {users.map(u => (
                 <tr key={u.id}>
@@ -140,9 +140,9 @@ export default function Admin() {
       )}
 
       <div className="card" style={{ marginTop: 16 }}>
-        <div style={{ fontWeight:700, marginBottom:8 }}>Đổi mật khẩu user</div>
+          <div style={{ fontWeight:700, marginBottom:8 }}>Đổi mật khẩu người dùng</div>
         <div className="form">
-          <label>User ID</label>
+          <label>ID người dùng</label>
           <input value={pwdForm.id} onChange={(e)=> setPwdForm(s=> ({ ...s, id: e.target.value }))} />
           <label>Mật khẩu mới</label>
           <input type="password" value={pwdForm.new_password} onChange={(e)=> setPwdForm(s=> ({ ...s, new_password: e.target.value }))} />

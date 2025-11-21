@@ -64,6 +64,8 @@ export default function Calendar() {
 
   const fmt = (v) => (Number(v)||0).toLocaleString('vi-VN')
 
+  const emptyMonth = !loading && !error && (sales.length===0 && purchases.length===0 && expenses.length===0)
+
   return (
     <div className="card">
       <h2>Lịch theo ngày</h2>
@@ -97,6 +99,9 @@ export default function Calendar() {
             )
           })}
         </div>
+      )}
+      {emptyMonth && (
+        <div className="empty-state" style={{ marginTop:12 }}>Chưa có giao dịch trong tháng này</div>
       )}
     </div>
   )

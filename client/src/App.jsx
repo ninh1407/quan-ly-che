@@ -5,6 +5,7 @@ import Expenses from './pages/Expenses.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import BalanceSheet from './pages/BalanceSheet.jsx'
 import FinishedStock from './pages/FinishedStock.jsx'
+import Calendar from './pages/Calendar.jsx'
 import Season from './pages/Season.jsx'
 import Suppliers from './pages/Suppliers.jsx'
 import Customers from './pages/Customers.jsx'
@@ -34,9 +35,10 @@ export default function App() {
   const allowedTabs = hasRole('admin')
     ? ['dashboard','balanceSheet','finishedStock','calendar','sales','purchases','expenses','debts','season','suppliers','customers','staff','changePwd','admin','stats','tradeStats']
     : Array.from(new Set([
+        'calendar',
         ...(hasRole('seller') ? ['sales'] : []),
         ...(hasRole('warehouse') ? ['purchases','finishedStock'] : []),
-        ...(hasRole('finance') ? ['dashboard','balanceSheet','calendar','expenses','debts'] : []),
+        ...(hasRole('finance') ? ['dashboard','balanceSheet','expenses','debts'] : []),
         'customers','suppliers','changePwd'
       ]))
   const go = (k) => { if (allowedTabs.includes(k)) setTab(k); else toast('Không có quyền truy cập') }
@@ -85,6 +87,7 @@ export default function App() {
                 ? [
                     { key:'dashboard', label:'📊 Tổng quan' },
                     { key:'balanceSheet', label:'📘 Bảng cân đối' },
+                    { key:'calendar', label:'📆 Lịch' },
                     { key:'finishedStock', label:'🏷️ Thành phẩm' },
                     { key:'season', label:'📅 Theo Đợt' },
                     { key:'sales', label:'🛒 Bán chè' },
@@ -119,6 +122,7 @@ export default function App() {
       <ToastContainer />
       {tab === 'dashboard' && <Dashboard />}
       {tab === 'balanceSheet' && <BalanceSheet />}
+      {tab === 'calendar' && <Calendar />}
       {tab === 'finishedStock' && <FinishedStock />}
       {tab === 'season' && <Season />}
       {tab === 'sales' && <Sales />}

@@ -2083,16 +2083,16 @@ app.get('/chat/users', requireAuth, (req, res) => {
   })
 })
 app.get('/admin/backups', requireAdmin, (req, res) => {
-  try { res.json(listBackups()) } catch (e) { res.status(500).json({ message: 'Backup list error', detail: e.message }) }
+  try { res.json(backupSqliteList()) } catch (e) { res.status(500).json({ message: 'Lỗi tải danh sách bản sao lưu', detail: e.message }) }
 })
 app.post('/admin/backup', requireAdmin, (req, res) => {
-  try { const name = backupSqliteNow(); res.json({ name }) } catch (e) { res.status(500).json({ message: 'Backup error', detail: e.message }) }
+  try { const name = backupSqliteNow(); res.json({ name }) } catch (e) { res.status(500).json({ message: 'Lỗi tạo bản sao lưu', detail: e.message }) }
 })
 app.post('/admin/restore', requireAdmin, (req, res) => {
   const { name } = req.body || {};
-  if (!name) return res.status(400).json({ message: 'Missing backup name' })
+  if (!name) return res.status(400).json({ message: 'Thiếu tên bản sao lưu' })
   restoreSqlite(String(name), (err) => {
-    if (err) return res.status(500).json({ message: 'Restore error', detail: err.message })
+    if (err) return res.status(500).json({ message: 'Khôi phục lỗi', detail: err.message })
     res.json({ ok: true })
   })
 })

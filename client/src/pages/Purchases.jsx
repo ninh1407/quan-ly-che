@@ -198,7 +198,8 @@ export default function Purchases() {
     ]);
     const totalSum = source.reduce((s, r) => s + (Number(r.total_cost) || 0), 0);
     const totalRow = ['Tổng cộng','','','','','','', '', fmtMoney(totalSum), ''];
-    const csv = [headers, ...rows, totalRow].map(row => row.map(v => (v ?? '')).join(',')).join('\n');
+    const makeLine = (row) => row.map(v => `"${String(v ?? '').replace(/"/g,'""')}"`).join(',')
+    const csv = ['\uFEFF'+makeLine(headers), ...rows.map(makeLine), makeLine(totalRow)].join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -223,7 +224,7 @@ export default function Purchases() {
     `</tr>`).join('');
     const totalSum = list.reduce((s, r) => s + (Number(r.total_cost) || 0), 0);
     const totalFormatted = fmtMoney(totalSum);
-    w.document.write(`<!doctype html><html><head><title>Purchases ${year}-${String(month).padStart(2,'0')}</title><style>
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Báo cáo Nhập ${year}-${String(month).padStart(2,'0')}</title><style>
       body{font-family:sans-serif}
       table{border-collapse:collapse;width:100%}
       th,td{border:1px solid #ccc;padding:6px;text-align:left}
@@ -377,10 +378,13 @@ export default function Purchases() {
                   <td className="num">{fmtMoney(r.unit_price)}</td>
                   <td className="num">{fmtMoney(r.total_cost)}</td>
                   <td><span className={`pill ${r.payment_status}`}>{STATUS_LABELS[r.payment_status] || r.payment_status}</span></td>
-                  <td>{r.payment_status==='paid' ? (<a href={receiptEndpoint('purchases', r.id)} target="_blank" rel="noreferrer">Xem</a>) : ''}</td>
+                  <td>{r.receipt_path ? (<a href={receiptEndpoint('purchases', r.id)} target="_blank" rel="noreferrer">Xem ảnh</a>) : (<span className="muted">Chưa có ảnh</span>)}</td>
                   <td>
                     {(hasRole('admin') || hasRole('finance')) && r.payment_status !== 'paid' && (
                       <button className="btn" onClick={() => markPaid(r.id)}>Đã thanh toán</button>
+                    )}
+                    {(hasRole('admin') || hasRole('finance')) && !r.receipt_path && (
+                      <button className="btn" style={{ marginLeft: 6 }} onClick={() => setPayModal({ id: r.id, file:null, error:'' })}>Đính kèm ảnh</button>
                     )}
                     {hasRole('admin') && <button className="btn" style={{ marginLeft: 6 }} onClick={() => editRow(r)}>Sửa</button>}
                     {hasRole('admin') && <button className="btn" style={{ marginLeft: 6 }} onClick={() => deleteRow(r.id)}>Xóa</button>}
