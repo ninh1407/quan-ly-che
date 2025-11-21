@@ -10,7 +10,7 @@
 .btn:hover{background:#eef2ff;border-color:#93c5fd}
 .btn:active{transform:translateY(1px)}
 .btn.primary{background:var(--primary);color:#fff;border-color:var(--primary);box-shadow:0 2px 6px rgba(25,118,210,.3)}
-.card{border:1px solid var(--border);border-radius:12px;padding:18px;background:var(--surface);box-shadow:0 4px 10px rgba(0,0,0,.04)}
+.card{border:1px solid var(--border);border-radius:16px;padding:20px;background:var(--surface);box-shadow:0 8px 24px rgba(0,0,0,.08)}
 .chart-card{height:260px;overflow:hidden;position:relative}
 .filters,.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;align-items:center}
 .filters label{font-weight:700}
@@ -31,8 +31,13 @@ input[type="number"]{text-align:right}
 .table tbody tr:nth-child(even){background:#fbfdff}
 .error{color:#c62828;margin-top:6px;background:#fdecea;border:1px solid #f5c2c7;padding:10px;border-radius:10px}
 .muted{color:var(--muted)}
-.kpi{background:#eaf2fb;border:1px solid #cdddf5;border-radius:14px;padding:14px;box-shadow:0 4px 12px rgba(25,118,210,.12)}
+.kpi{display:flex;align-items:center;gap:10px;background:var(--accent);border:1px solid var(--border);border-radius:18px;padding:16px;box-shadow:0 6px 20px var(--shadow)}
 .kpi .kpi-value{font-size:22px;font-weight:700}
+.kpi .icon{width:28px;height:28px;border-radius:999px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center}
+/* Wood tone overrides */
+[data-theme="wood"] .kpi{background:#F7F3E9;border-color:#D6C29A}
+[data-theme="wood"] .kpi .kpi-value{color:#355E3B}
+[data-theme="wood"] .kpi .icon{background:#355E3B}
 h1{background:var(--primary);color:#fff;padding:14px 16px;border-radius:16px;box-shadow:0 6px 20px rgba(59,125,191,.25)}
 .section-bar{background:var(--accent);border:1px solid var(--border);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 6px var(--shadow)}
 .badge{display:inline-block;padding:2px 6px;border-radius:999px;background:#7c3aed;color:#fff;font-size:12px}
@@ -40,6 +45,8 @@ body{background:var(--bg)}
 /* Hero branding for tea trading */
 .hero{position:relative;border-radius:20px;padding:32px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#e0f2fe 0%,#fef3c7 60%,#fce7f3 100%);box-shadow:0 10px 28px rgba(0,0,0,.08);margin-bottom:16px;border:1px solid var(--border)}
 .hero{margin-bottom:24px}
+.hero.with-img:after{content:"";position:absolute;inset:0;background-image:var(--hero-img);background-size:cover;background-position:center;opacity:.06;pointer-events:none}
+.hero.with-pattern:before{content:"";position:absolute;inset:0;background-image:var(--pattern-img);background-size:contain;background-repeat:no-repeat;background-position:right top;opacity:.08;pointer-events:none}
 .hero .hero-left{display:flex;flex-direction:column;gap:8}
 .hero-title{font-size:28px;font-weight:800;color:#0f172a}
 .hero-sub{font-size:16px;color:#475569}
@@ -95,17 +102,36 @@ body{background:var(--bg)}
 }
 /* Tea theme (Brown-Green) */
 [data-theme="tea"]{
-  --bg:#faf4ef;
-  --surface:#fffaf3;
-  --text:#3f2f1d;
-  --muted:#6b5b45;
-  --border:#e2d7c9;
-  --primary:#2e7d32; /* green */
-  --primary-hover:#1b5e20;
-  --accent:#f3e9db;
-  --shadow:rgba(63,47,29,.12);
-  --pill-pending-bg:#f6e5d1; --pill-pending-border:#dba35b; --pill-pending-text:#8a5a2b;
-  --pill-paid-bg:#e8f5e9; --pill-paid-border:#a5d6a7; --pill-paid-text:#2e7d32;
+  --bg:#DFF5E3;
+  --surface:#FFFFFF;
+  --text:#1A8754;
+  --muted:#4b6f5a;
+  --border:#CFEAD7;
+  --primary:#1A8754;
+  --primary-hover:#15734A;
+  --accent:#F5F6F7;
+  --shadow:rgba(26,135,84,.18);
+  --pill-pending-bg:#fff7ed; --pill-pending-border:#fdba74; --pill-pending-text:#c2410c;
+  --pill-paid-bg:#e6f7ee; --pill-paid-border:#b7e3c9; --pill-paid-text:#1A8754;
+}
+/* Wood theme (Traditional Vietnamese Tea) */
+[data-theme="wood"]{
+  --bg:#F7F3E9;
+  --surface:#F7F3E9;
+  --text:#5A3E2B;
+  --muted:#7B5231;
+  --border:#D6C29A;
+  --primary:#7B5231;
+  --primary-hover:#5A3E2B;
+  --accent:#EFE6D2;
+  --shadow:rgba(90,62,43,.18);
+  --pill-pending-bg:#EFE6D2; --pill-pending-border:#D6C29A; --pill-pending-text:#7B5231;
+  --pill-paid-bg:#e6f3e9; --pill-paid-border:#9cc5a5; --pill-paid-text:#355E3B;
+  --wood-img:url('/wood-texture.jpg');
+  --pattern-img:url('/dong-son.png');
+  --chart-sales-color:#355E3B;
+  --chart-costs-color:#9A4F2E;
+  --chart-profit-color:#D6C29A;
 }
 h1{background:var(--primary);color:#fff;padding:14px 16px;border-radius:16px;box-shadow:0 6px 20px rgba(59,125,191,.25)}
 /* Dropdown for overflow tabs */
@@ -157,6 +183,7 @@ html{scroll-behavior:smooth}
 .shadow-6{box-shadow:0 14px 40px var(--shadow)}
 .layout{display:grid;grid-template-columns:240px 1fr;gap:16px}
 .sidebar{position:sticky;top:8px;height:calc(100vh - 16px);background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.sidebar:after{content:"";position:absolute;inset:0;opacity:.06;pointer-events:none;background-image:var(--wood-img);background-size:cover;background-position:center;border-radius:16px}
 .sidebar.collapsed{grid-template-columns:60px; width:60px}
 .sidebar-header{display:flex;justify-content:flex-end}
 .sidebar-items{display:flex;flex-direction:column;gap:8}
@@ -187,3 +214,12 @@ html{scroll-behavior:smooth}
 .login-actions{display:flex;gap:8;align-items:center;margin-top:6px}
 .btn.primary{background:linear-gradient(90deg,var(--primary) 0%,#3b82f6 100%);border-color:transparent}
 .btn.primary:hover{filter:brightness(1.05)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:768px){.grid-2{grid-template-columns:1fr}}
+[data-theme="wood"] .table th{background:#7B5231;color:#F7F3E9;border-bottom:1px solid #D6C29A}
+[data-theme="wood"] .table tbody tr:hover{background:#EFE6D2}
+[data-theme="wood"] .card{background:#F7F3E9;border:1px solid #D6C29A;box-shadow:0 8px 24px rgba(90,62,43,.18)}
+[data-theme="wood"] input,[data-theme="wood"] select{background:#FFFFFF;border-color:#D6C29A}
+[data-theme="wood"] .btn.primary{background:#9A4F2E;border-color:#9A4F2E}
+[data-theme="wood"] .btn.primary:hover{background:#5A3E2B}
+[data-theme="wood"] h1{background:var(--primary)}

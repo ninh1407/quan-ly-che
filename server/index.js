@@ -552,6 +552,14 @@ if (SQLITE_READY) db.serialize(() => {
       ensureCol('export_type', `ALTER TABLE customers ADD COLUMN export_type TEXT`);
     }
   });
+  db.run(`CREATE TABLE IF NOT EXISTS finished_stock (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entry_date TEXT,
+    tea_type TEXT,
+    weight REAL,
+    unit_cost REAL,
+    note TEXT
+  )`);
 });
 
 function pad2(n) { return String(n).padStart(2, '0'); }
@@ -1148,6 +1156,99 @@ app.delete('/purchases/:id', requireAdmin, (req, res) => {
   });
 });
 
+// Finished stock endpoints
+app.get('/finished-stock', requireAuth, (req, res) => {
+  const { month, year } = req.query;
+  if (MONGO_READY) {
+    const m = String(month || '').padStart(2, '0');
+    const y = String(year || '');
+    const and = [];
+    if (month && year) and.push({ entry_date: { $regex: `^${y}-${m}` } });
+    const filter = and.length ? { $and: and } : {};
+    return mongoDb.collection('finished_stock').find(filter).sort({ entry_date: 1, id: 1 }).toArray()
+      .then(rows => res.json(rows.map(r => ({ id: r.id, entry_date: r.entry_date, tea_type: r.tea_type || '', weight: Number(r.weight || 0), unit_cost: Number(r.unit_cost || 0), note: r.note || null }))))
+      .catch(err => res.status(500).json({ message: 'DB error', detail: err.message }));
+  }
+  if (!SQLITE_READY) return res.status(500).json({ message: 'DB error', detail: 'SQLite disabled' });
+  const where = [];
+  const params = [];
+  if (month && year) { where.push("strftime('%m', entry_date) = ?"); params.push(pad2(month)); where.push("strftime('%Y', entry_date) = ?"); params.push(String(year)); }
+  const sql = `SELECT id, entry_date, tea_type, weight, unit_cost, note FROM finished_stock ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY entry_date ASC, id ASC`;
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ message: 'DB error', detail: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/finished-stock', requireAuth, (req, res) => {
+  if (!(hasRole(req, 'admin') || hasRole(req, 'warehouse'))) return res.status(403).json({ message: 'Forbidden: warehouse/admin required' })
+  const { entry_date, tea_type, weight, unit_cost, note } = req.body || {};
+  const w = Number(weight);
+  const c = Number(unit_cost);
+  if (!entry_date || w <= 0 || c < 0) return res.status(400).json({ message: 'Missing/invalid entry_date/weight/unit_cost' });
+  if (MONGO_READY) {
+    nextId('finished_stock').then(id => {
+      const doc = { id, entry_date, tea_type: tea_type || '', weight: w, unit_cost: c, note: note || null };
+      mongoDb.collection('finished_stock').insertOne(doc).then(() => { auditLog('finished_stock', id, 'create', req, { entry_date, tea_type, weight: w, unit_cost: c, note }); res.json({ id }) }).catch(e => res.status(500).json({ message: 'DB error', detail: e.message }));
+    });
+    return;
+  }
+  if (!SQLITE_READY) return res.status(500).json({ message: 'DB error', detail: 'SQLite disabled' });
+  db.run(`INSERT INTO finished_stock (entry_date, tea_type, weight, unit_cost, note) VALUES (?,?,?,?,?)`, [entry_date, tea_type || '', w, c, note || null], function (err) {
+    if (err) return res.status(500).json({ message: 'DB error', detail: err.message });
+    const id = this.lastID;
+    if (MONGO_READY) mongoDb.collection('finished_stock').insertOne({ id, entry_date, tea_type: tea_type || '', weight: w, unit_cost: c, note: note || null }).catch(() => {});
+    auditLog('finished_stock', id, 'create', req, { entry_date, tea_type, weight: w, unit_cost: c, note });
+    res.json({ id });
+  });
+});
+
+app.put('/finished-stock/:id', requireAuth, (req, res) => {
+  if (!(hasRole(req, 'admin') || hasRole(req, 'warehouse'))) return res.status(403).json({ message: 'Forbidden: warehouse/admin required' })
+  const id = Number(req.params.id);
+  const { entry_date, tea_type, weight, unit_cost, note } = req.body || {};
+  const upd = {};
+  if (entry_date != null) upd.entry_date = entry_date;
+  if (tea_type != null) upd.tea_type = tea_type;
+  if (weight != null) upd.weight = Number(weight);
+  if (unit_cost != null) upd.unit_cost = Number(unit_cost);
+  if (note != null) upd.note = note;
+  if (MONGO_READY) {
+    return mongoDb.collection('finished_stock').updateOne({ id }, { $set: upd }, { upsert: true }).then(() => { auditLog('finished_stock', id, 'update', req, upd); res.json({ changed: 1 }) }).catch(e => res.status(500).json({ message: 'DB error', detail: e.message }));
+  }
+  if (!SQLITE_READY) return res.status(500).json({ message: 'DB error', detail: 'SQLite disabled' });
+  const fields = []; const params = [];
+  if (entry_date != null) { fields.push('entry_date = ?'); params.push(entry_date) }
+  if (tea_type != null) { fields.push('tea_type = ?'); params.push(tea_type) }
+  if (weight != null) { fields.push('weight = ?'); params.push(Number(weight)) }
+  if (unit_cost != null) { fields.push('unit_cost = ?'); params.push(Number(unit_cost)) }
+  if (note != null) { fields.push('note = ?'); params.push(note) }
+  if (!fields.length) return res.status(400).json({ message: 'No fields to update' });
+  params.push(id);
+  db.run(`UPDATE finished_stock SET ${fields.join(', ')} WHERE id = ?`, params, function (err) {
+    if (err) return res.status(500).json({ message: 'DB error', detail: err.message });
+    if (MONGO_READY) mongoDb.collection('finished_stock').updateOne({ id }, { $set: upd }, { upsert: true }).catch(() => {});
+    auditLog('finished_stock', id, 'update', req, upd);
+    res.json({ changed: this.changes });
+  })
+})
+
+app.delete('/finished-stock/:id', requireAuth, (req, res) => {
+  if (!(hasRole(req, 'admin') || hasRole(req, 'warehouse'))) return res.status(403).json({ message: 'Forbidden: warehouse/admin required' })
+  const id = Number(req.params.id);
+  if (MONGO_READY) {
+    mongoDb.collection('finished_stock').deleteOne({ id }).then(r => res.json({ deleted: r.deletedCount || 0 })).catch(e => res.status(500).json({ message: 'DB error', detail: e.message }));
+    return;
+  }
+  if (!SQLITE_READY) return res.status(500).json({ message: 'DB error', detail: 'SQLite disabled' });
+  db.run('DELETE FROM finished_stock WHERE id = ?', [id], function (err) {
+    if (err) return res.status(500).json({ message: 'DB error', detail: err.message });
+    if (MONGO_READY) mongoDb.collection('finished_stock').deleteOne({ id }).catch(() => {});
+    auditLog('finished_stock', id, 'delete', req, {});
+    res.json({ deleted: this.changes });
+  });
+})
+
 app.get('/purchases/:id/receipt', requireAuth, (req, res) => {
   const id = Number(req.params.id);
   const sendFile = (rel) => {
@@ -1650,21 +1751,35 @@ app.get('/balance-sheet', requireAuth, async (req, res) => {
       const payAging = { in_due:0, overdue_7:0, overdue_30:0 }
       payRows.forEach(r => { const v = Number(r.total_cost != null ? r.total_cost : (Number(r.unit_price||0)*Number(r.net_weight!=null?r.net_weight:r.weight||0))); const d = dayDiff(r.purchase_date); if (d<=7) payAging.in_due+=v; else if (d<=30) payAging.overdue_7+=v; else payAging.overdue_30+=v })
       const costPending = sumExp(expAll.filter(r => !r.receipt_path))
-      const qtyIn = purchAll.reduce((s,r)=> s + Number(r.net_weight!=null?r.net_weight:r.weight||0), 0)
+      const fgAll = await mongoDb.collection('finished_stock').find({ entry_date: { $regex: `^${prefix}` } }).toArray()
       const qtyOut = salesAll.reduce((s,r)=> s + Number(r.weight||0), 0)
+      const fgQtyIn = fgAll.reduce((s,r)=> s + Number(r.weight||0), 0)
+      const useFinished = fgQtyIn > 0
+      const qtyIn = useFinished ? fgQtyIn : purchAll.reduce((s,r)=> s + Number(r.net_weight!=null?r.net_weight:r.weight||0), 0)
       const invQty = Math.max(0, qtyIn - qtyOut)
       let avgCost = 0
       if (valuation === '7d' || valuation === '30d') {
         const days = valuation==='7d' ? 7 : 30
         const ref = new Date(`${year}-${month}-28`)
         const since = new Date(ref.getTime() - days*24*3600*1000)
-        const items = await mongoDb.collection('purchases').find({ purchase_date: { $gte: since.toISOString().slice(0,10), $lte: ref.toISOString().slice(0,10) } }).toArray()
-        const sum = items.reduce((s,r)=> s + Number(r.unit_price||0) * Number(r.net_weight!=null?r.net_weight:r.weight||0), 0)
-        const wsum = items.reduce((s,r)=> s + Number(r.net_weight!=null?r.net_weight:r.weight||0), 0)
+        const items = useFinished
+          ? await mongoDb.collection('finished_stock').find({ entry_date: { $gte: since.toISOString().slice(0,10), $lte: ref.toISOString().slice(0,10) } }).toArray()
+          : await mongoDb.collection('purchases').find({ purchase_date: { $gte: since.toISOString().slice(0,10), $lte: ref.toISOString().slice(0,10) } }).toArray()
+        const sum = useFinished
+          ? items.reduce((s,r)=> s + Number(r.unit_cost||0) * Number(r.weight||0), 0)
+          : items.reduce((s,r)=> s + Number(r.unit_price||0) * Number(r.net_weight!=null?r.net_weight:r.weight||0), 0)
+        const wsum = useFinished
+          ? items.reduce((s,r)=> s + Number(r.weight||0), 0)
+          : items.reduce((s,r)=> s + Number(r.net_weight!=null?r.net_weight:r.weight||0), 0)
         avgCost = wsum>0 ? (sum/wsum) : 0
       } else {
-        const totalPurchValue = sumPurch(purchAll)
-        avgCost = qtyIn>0 ? (totalPurchValue/qtyIn) : 0
+        if (useFinished) {
+          const totalFgValue = fgAll.reduce((s,r)=> s + Number(r.unit_cost||0) * Number(r.weight||0), 0)
+          avgCost = fgQtyIn>0 ? (totalFgValue/fgQtyIn) : 0
+        } else {
+          const totalPurchValue = sumPurch(purchAll)
+          avgCost = qtyIn>0 ? (totalPurchValue/qtyIn) : 0
+        }
       }
       const invVal = Math.round(avgCost * invQty)
       const profitMonth = sumSales(salesAll) - sumPurch(purchAll) - sumExp(expAll)
@@ -1706,22 +1821,37 @@ app.get('/balance-sheet', requireAuth, async (req, res) => {
       const payAging = { in_due:0, overdue_7:0, overdue_30:0 }
       payRows.forEach(r => { const v = Number(r.unit_price||0)*Number(r.nw||0); const d = dayDiff(r.purchase_date); if (d<=7) payAging.in_due+=v; else if (d<=30) payAging.overdue_7+=v; else payAging.overdue_30+=v })
       const costPending = sumExp(expAll.filter(r => !r.receipt_path))
-      const qtyIn = purchAll.reduce((s,r)=> s + Number(r.nw||0), 0)
+      const fgAll = await new Promise((resolve)=> db.all(`SELECT entry_date, weight, unit_cost FROM finished_stock`, [], (e, rows)=> resolve(e?[]:rows)))
+      const fgMonth = fgAll.filter(r => String(r.entry_date||'').startsWith(prefix))
       const qtyOut = salesAll.reduce((s,r)=> s + Number(r.weight||0), 0)
+      const fgQtyIn = fgMonth.reduce((s,r)=> s + Number(r.weight||0), 0)
+      const useFinished = fgQtyIn > 0
+      const qtyIn = useFinished ? fgQtyIn : purchAll.reduce((s,r)=> s + Number(r.nw||0), 0)
       const invQty = Math.max(0, qtyIn - qtyOut)
       let avgCost = 0
       if (valuation === '7d' || valuation === '30d') {
         const days = valuation==='7d' ? 7 : 30
         const ref = new Date(`${year}-${month}-28`)
         const since = new Date(ref.getTime() - days*24*3600*1000)
-        const items = await new Promise((resolve)=> db.all(`SELECT unit_price, COALESCE(net_weight, weight) AS nw, purchase_date FROM purchases`, [], (e, rows)=> resolve(e?[]:rows)))
-        const filtered = items.filter(r => { const d = new Date(r.purchase_date); return d>=since && d<=ref })
-        const sum = filtered.reduce((s,r)=> s + Number(r.unit_price||0) * Number(r.nw||0), 0)
-        const wsum = filtered.reduce((s,r)=> s + Number(r.nw||0), 0)
-        avgCost = wsum>0 ? (sum/wsum) : 0
+        if (useFinished) {
+          const filtered = fgAll.filter(r => { const d = new Date(r.entry_date); return d>=since && d<=ref })
+          const sum = filtered.reduce((s,r)=> s + Number(r.unit_cost||0) * Number(r.weight||0), 0)
+          const wsum = filtered.reduce((s,r)=> s + Number(r.weight||0), 0)
+          avgCost = wsum>0 ? (sum/wsum) : 0
+        } else {
+          const items = purchAll
+          const sum = items.reduce((s,r)=> s + Number(r.unit_price||0) * Number(r.nw||0), 0)
+          const wsum = items.reduce((s,r)=> s + Number(r.nw||0), 0)
+          avgCost = wsum>0 ? (sum/wsum) : 0
+        }
       } else {
-        const totalPurchValue = sumPurch(purchAll)
-        avgCost = qtyIn>0 ? (totalPurchValue/qtyIn) : 0
+        if (useFinished) {
+          const totalFgValue = fgMonth.reduce((s,r)=> s + Number(r.unit_cost||0) * Number(r.weight||0), 0)
+          avgCost = fgQtyIn>0 ? (totalFgValue/fgQtyIn) : 0
+        } else {
+          const totalPurchValue = sumPurch(purchAll)
+          avgCost = qtyIn>0 ? (totalPurchValue/qtyIn) : 0
+        }
       }
       const invVal = Math.round(avgCost * invQty)
       const profitMonth = sumSales(salesAll) - sumPurch(purchAll) - sumExp(expAll)

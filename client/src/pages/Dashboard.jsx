@@ -25,6 +25,8 @@ export default function Dashboard() {
   const [totals, setTotals] = useState({ totalSales: 0, totalPurchases: 0, totalExpenses: 0, netProfit: 0, variableCost: 0, fixedExpense: 0, variablePct: 0, fixedPct: 0, profitMarginPct: 0 });
   const [tops, setTops] = useState({ buyers_top: [], suppliers_top: [] })
   const [netByMonth, setNetByMonth] = useState([])
+  const [notifs, setNotifs] = useState([])
+  const heroImg = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_HERO_IMG_URL) ? import.meta.env.VITE_HERO_IMG_URL : '/hero-tea.jpg'
 
   const monthOptions = useMemo(() => Array.from({ length: 12 }, (_, i) => i + 1), []);
   const yearOptions = useMemo(() => {
@@ -108,6 +110,7 @@ export default function Dashboard() {
   };
 
   useEffect(() => { load(); }, [month, year, selectedDay]);
+  useEffect(() => { (async () => { try { const r = await api.get('/notifications'); setNotifs(r.data||[]) } catch {} })() }, [month, year])
 
   useEffect(() => {
     const dim = new Date(year, month, 0).getDate();
@@ -179,18 +182,22 @@ export default function Dashboard() {
     let chartLine, chartD, chartNet
     (async () => {
       const { default: Chart } = await import('chart.js/auto')
+      const css = getComputedStyle(document.documentElement)
+      const cSales = css.getPropertyValue('--chart-sales-color')?.trim() || '#2563eb'
+      const cCosts = css.getPropertyValue('--chart-costs-color')?.trim() || '#ef4444'
+      const cProfit = css.getPropertyValue('--chart-profit-color')?.trim() || '#22c55e'
       const isMobile = (typeof window !== 'undefined' && window.innerWidth <= 768)
       if (lineRef.current) {
         const ctx = lineRef.current.getContext('2d')
-        const gradBlue = ctx.createLinearGradient(0,0,0,200); gradBlue.addColorStop(0,'rgba(37,99,235,.5)'); gradBlue.addColorStop(1,'rgba(37,99,235,.1)')
-        const gradRed = ctx.createLinearGradient(0,0,0,200); gradRed.addColorStop(0,'rgba(239,68,68,.5)'); gradRed.addColorStop(1,'rgba(239,68,68,.1)')
+        const gradSales = ctx.createLinearGradient(0,0,0,200); gradSales.addColorStop(0,`${cSales}80`); gradSales.addColorStop(1,`${cSales}20`)
+        const gradCosts = ctx.createLinearGradient(0,0,0,200); gradCosts.addColorStop(0,`${cCosts}80`); gradCosts.addColorStop(1,`${cCosts}20`)
         chartLine = new Chart(lineRef.current, {
           type: 'line',
           data: {
             labels: days.map(d => fmtLocalDate(d)),
             datasets: [
-              { label: 'Thu', data: salesByDay.map(x => x.total), borderColor: '#2563eb', backgroundColor: gradBlue, tension: .25, borderWidth: 2, fill:true },
-              { label: 'Chi', data: costsByDay.map(x => x.total), borderColor: '#ef4444', backgroundColor: gradRed, tension: .25, borderWidth: 2, fill:true }
+              { label: 'Thu', data: salesByDay.map(x => x.total), borderColor: cSales, backgroundColor: gradSales, tension: .25, borderWidth: 2, fill:true },
+              { label: 'Chi', data: costsByDay.map(x => x.total), borderColor: cCosts, backgroundColor: gradCosts, tension: .25, borderWidth: 2, fill:true }
             ]
           }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'bottom' }, tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${Number(ctx.parsed.y||0).toLocaleString()}` } } }, scales: { y: { beginAtZero: true, grid: { color:'rgba(0,0,0,.06)' } }, x:{ ticks: { autoSkip: true, maxTicksLimit: isMobile ? 5 : 10 }, grid:{ display:false } } } }
         })
@@ -199,19 +206,19 @@ export default function Dashboard() {
         chartD = new Chart(doughnutRef.current, {
           type: 'doughnut', data: {
             labels: ['Biến phí/DT', 'Định phí/DT', 'Biên lợi nhuận'],
-            datasets: [{ data: [Math.max(0, variablePct), Math.max(0, fixedPct), Math.max(0, profitMarginPct)], backgroundColor: ['#f59e0b','#6b7280','#22c55e'] }]
+            datasets: [{ data: [Math.max(0, variablePct), Math.max(0, fixedPct), Math.max(0, profitMarginPct)], backgroundColor: [cCosts, '#6b7280', cProfit] }]
           }, options: { plugins: { legend: { display: true } } }
         })
       }
       if (netMonthRef.current && netByMonth.length) {
-        chartNet = new Chart(netMonthRef.current, { type:'line', data:{ labels: netByMonth.map(x => `${x.y}-${String(x.m).padStart(2,'0')}`), datasets:[{ label:'Thu (tháng)', data: netByMonth.map(x => x.sales||0), borderColor:'#2563eb', backgroundColor:'rgba(37,99,235,.15)', tension:.25, borderWidth:2, fill:true }, { label:'Chi (tháng)', data: netByMonth.map(x => x.costs||0), borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,.15)', tension:.25, borderWidth:2, fill:true }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:true, position:'bottom' } }, scales:{ y:{ beginAtZero:true }, x:{ ticks:{ autoSkip:true, maxTicksLimit:6 }, grid:{ display:false } } } } })
+        chartNet = new Chart(netMonthRef.current, { type:'line', data:{ labels: netByMonth.map(x => `${x.y}-${String(x.m).padStart(2,'0')}`), datasets:[{ label:'Thu (tháng)', data: netByMonth.map(x => x.sales||0), borderColor:cSales, backgroundColor:`${cSales}33`, tension:.25, borderWidth:2, fill:true }, { label:'Chi (tháng)', data: netByMonth.map(x => x.costs||0), borderColor:cCosts, backgroundColor:`${cCosts}33`, tension:.25, borderWidth:2, fill:true }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:true, position:'bottom' } }, scales:{ y:{ beginAtZero:true }, x:{ ticks:{ autoSkip:true, maxTicksLimit:6 }, grid:{ display:false } } } } })
       }
       // bar chart cơ cấu chi phí theo nhóm
       const cats = expenseCats.map(x => x.name)
       const vals = expenseCats.map(x => x.amount)
       const barEl = document.getElementById('chart-expense-bar')
       if (barEl && cats.length) {
-        new Chart(barEl, { type:'bar', data:{ labels: cats, datasets:[{ label:'Chi phí theo nhóm', data: vals, backgroundColor:'#2563eb' }] }, options:{ plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true } } } })
+        new Chart(barEl, { type:'bar', data:{ labels: cats, datasets:[{ label:'Chi phí theo nhóm', data: vals, backgroundColor:cCosts }] }, options:{ plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true } } } })
       }
     })()
     return () => { chartLine && chartLine.destroy(); chartD && chartD.destroy(); chartNet && chartNet.destroy() }
@@ -220,6 +227,19 @@ export default function Dashboard() {
   return (
     <div className="card">
       <FilterBar month={month} year={year} setMonth={setMonth} setYear={setYear} selectedDay={selectedDay} setSelectedDay={setSelectedDay} />
+      <div className="hero with-img with-pattern" style={{ '--hero-img': `url(${heroImg})` }}>
+        <div className="hero-left">
+          <div className="hero-title">Hệ thống quản lý thu mua chè</div>
+          <div className="hero-sub">Ảnh nền nhẹ, tối ưu cho tốc độ</div>
+          <div className="hero-badge"><span className="hero-emoji">🍃</span> Xanh chè • Tinh khiết • Mát mắt</div>
+        </div>
+        <div className="hero-stats">
+          <div className="hero-stat"><div className="muted">Thu</div><div className="num">{fmtMoney(totalSales)}</div></div>
+          <div className="hero-stat"><div className="muted">Chi</div><div className="num">{fmtMoney(totalCosts)}</div></div>
+          <div className="hero-stat"><div className="muted">Lãi/Lỗ</div><div className="num" style={{ color: netProfit>=0?'#1A8754':'#c62828' }}>{fmtMoney(netProfit)}</div></div>
+        </div>
+        <div className="bg-decor" />
+      </div>
 
       {error && <div className="error" style={{ marginTop: 8 }}>{error}</div>}
 
@@ -227,31 +247,12 @@ export default function Dashboard() {
         {loading ? 'Đang tải...' : (
           <div>
             {/* Dòng KPI */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
-              <div className="kpi">
-                <div className="muted">Tổng Thu</div>
-                <div className="kpi-value">{totalSales.toLocaleString()} đ</div>
-              </div>
-              <div className="kpi">
-                <div className="muted">Tổng Chi</div>
-                <div className="kpi-value">{totalCosts.toLocaleString()} đ</div>
-              </div>
-              <div className="kpi">
-                <div className="muted">Doanh thu</div>
-                <div className="kpi-value">{totalSales.toLocaleString()} đ</div>
-              </div>
-              <div className="kpi">
-                <div className="muted">Doanh thu tháng trước</div>
-                <div className="kpi-value">{prevTotalSales.toLocaleString()} đ</div>
-              </div>
-              <div className="kpi">
-                <div className="muted">Lãi/Lỗ</div>
-                <div className="kpi-value" style={{ color: netProfit >= 0 ? '#2e7d32' : '#c62828' }}>{netProfit.toLocaleString()} đ</div>
-              </div>
-              <div className="kpi">
-                <div className="muted">Biên lợi nhuận</div>
-                <div className="kpi-value" style={{ color: profitMarginPct >= 0 ? '#2e7d32' : '#c62828' }}>{profitMarginPct.toFixed(1)}%</div>
-              </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16 }}>
+              <div className="kpi"><div className="icon">📈</div><div><div className="muted">Tổng Thu</div><div className="kpi-value" style={{ color:'#1A8754' }}>{fmtMoney(totalSales)} đ</div></div></div>
+              <div className="kpi"><div className="icon">📉</div><div><div className="muted">Tổng Chi</div><div className="kpi-value" style={{ color:'#ef4444' }}>{fmtMoney(totalCosts)} đ</div></div></div>
+              <div className="kpi"><div className="icon">💵</div><div><div className="muted">Doanh thu</div><div className="kpi-value">{fmtMoney(totalSales)} đ</div></div></div>
+              <div className="kpi"><div className="icon">💹</div><div><div className="muted">Biên lợi nhuận</div><div className="kpi-value" style={{ color: profitMarginPct>=0?'#1A8754':'#c62828' }}>{profitMarginPct.toFixed(1)}%</div></div></div>
+              <div className="kpi"><div className="icon">🗓️</div><div><div className="muted">Tháng trước</div><div className="kpi-value">{fmtMoney(prevTotalSales)} đ</div></div></div>
             </div>
 
             {/* Widget gộp Thu–Chi–Lãi */}
@@ -268,19 +269,19 @@ export default function Dashboard() {
             </div>
 
             {/* Biểu đồ Chart.js */}
-            <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+            <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '2.5fr 1fr', gap: 16 }}>
               <div className="card chart-card">
-                <div className="muted" style={{ marginBottom: 6 }}>Dòng tiền theo ngày (Chart.js)</div>
-                <canvas ref={lineRef} style={{ width:'100%', height:'200px' }} />
+                <div className="muted" style={{ marginBottom: 6 }}>Dòng tiền theo ngày</div>
+                <canvas ref={lineRef} style={{ width:'100%', height:'320px' }} />
               </div>
               <div className="card chart-card">
                 <div className="muted" style={{ marginBottom: 6 }}>Tỷ lệ/DT (doughnut)</div>
-                <canvas ref={doughnutRef} style={{ width:'100%', height:'200px' }} />
+                <canvas ref={doughnutRef} style={{ width:'100%', height:'280px' }} />
               </div>
             </div>
             <div className="card chart-card" style={{ marginTop:16 }}>
               <div className="muted" style={{ marginBottom: 6 }}>Thu–Chi theo tháng</div>
-              <canvas ref={netMonthRef} style={{ width:'100%', height:'220px' }} />
+              <canvas ref={netMonthRef} style={{ width:'100%', height:'320px' }} />
             </div>
             <div className="card chart-card" style={{ marginTop:16 }}>
               <div className="muted" style={{ marginBottom: 6 }}>Cơ cấu chi phí theo nhóm</div>
@@ -361,7 +362,7 @@ export default function Dashboard() {
                 </tbody>
               </table>
             </div>
-            <div style={{ marginTop:16, display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            <div style={{ marginTop:16, display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
               <div className="card">
                 <div style={{ fontWeight:700, marginBottom:6 }}>Top 5 Khách hàng</div>
                 {((tops.buyers_top||[]).length===0) ? (
@@ -377,6 +378,20 @@ export default function Dashboard() {
                 ) : (
                   <table className="table compact"><thead><tr><th>Tên</th><th className="num">Số vụ</th><th className="num">Kg</th><th className="num">Tổng</th></tr></thead><tbody>{(tops.suppliers_top||[]).slice(0,5).map(r => (<tr key={r.name}><td title={r.name}>{r.name}</td><td className="num">{(Number(r.count)||0).toLocaleString()}</td><td className="num">{(Number(r.weight)||0).toLocaleString()}</td><td className="num">{fmtMoney(Number(r.amount)||0)} đ</td></tr>))}</tbody></table>
                 )}
+              </div>
+              <div className="card" style={{ gridColumn:'1 / -1' }}>
+                <div style={{ fontWeight:700, marginBottom:6 }}>Top chi phí trong tháng</div>
+                {expenseCats.length ? (
+                  <table className="table compact"><thead><tr><th>Nhóm</th><th className="num">Giá trị</th></tr></thead><tbody>{[...expenseCats].sort((a,b)=>b.amount-a.amount).slice(0,5).map((x,i)=>(<tr key={i}><td>{x.name}</td><td className="num">{fmtMoney(x.amount)}</td></tr>))}</tbody></table>
+                ) : (
+                  <div className="empty-state" style={{ marginTop:8 }}>Chưa có dữ liệu</div>
+                )}
+              </div>
+              <div className="card" style={{ gridColumn:'1 / -1' }}>
+                <div style={{ fontWeight:700, marginBottom:6 }}>Thông báo nội bộ</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {(notifs||[]).slice(0,5).map((n,i)=>(<div key={i} className="muted">• {n}</div>))}
+                </div>
               </div>
             </div>
           </div>

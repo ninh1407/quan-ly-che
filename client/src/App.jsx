@@ -4,6 +4,7 @@ import Purchases from './pages/Purchases.jsx'
 import Expenses from './pages/Expenses.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import BalanceSheet from './pages/BalanceSheet.jsx'
+import FinishedStock from './pages/FinishedStock.jsx'
 import Season from './pages/Season.jsx'
 import Suppliers from './pages/Suppliers.jsx'
 import Customers from './pages/Customers.jsx'
@@ -31,10 +32,10 @@ export default function App() {
   const rolesRaw = (() => { try { const r = JSON.parse(localStorage.getItem('roles')||'null'); if (Array.isArray(r)) return r; } catch {} const s = (localStorage.getItem('role')||'user'); return String(s).split(',').map(x=>x.trim()).filter(Boolean) })()
   const hasRole = (name) => rolesRaw.includes(name)
   const allowedTabs = hasRole('admin')
-    ? ['dashboard','balanceSheet','calendar','sales','purchases','expenses','debts','season','suppliers','customers','staff','changePwd','admin','stats','tradeStats']
+    ? ['dashboard','balanceSheet','finishedStock','calendar','sales','purchases','expenses','debts','season','suppliers','customers','staff','changePwd','admin','stats','tradeStats']
     : Array.from(new Set([
         ...(hasRole('seller') ? ['sales'] : []),
-        ...(hasRole('warehouse') ? ['purchases'] : []),
+        ...(hasRole('warehouse') ? ['purchases','finishedStock'] : []),
         ...(hasRole('finance') ? ['dashboard','balanceSheet','calendar','expenses','debts'] : []),
         'customers','suppliers','changePwd'
       ]))
@@ -62,7 +63,7 @@ export default function App() {
       <Breadcrumb tab={tab} />
       <div className="tabs">
         <button className="hamburger-btn" onClick={() => setMenuOpen(true)}>☰ Menu</button>
-        <button className="btn" onClick={() => setTheme(theme === 'light' ? 'dark' : (theme==='dark' ? 'tea' : 'light'))}>{theme === 'light' ? '🌙 Tối' : (theme==='dark' ? '🍵 Nâu – Xanh lá' : '☀️ Sáng')}</button>
+        <button className="btn" onClick={() => setTheme(theme === 'light' ? 'dark' : (theme==='dark' ? 'tea' : (theme==='tea' ? 'wood' : 'light')))}>{theme === 'light' ? '🌙 Tối' : (theme==='dark' ? '🍵 Nâu – Xanh lá' : (theme==='tea' ? '🪵 Gỗ truyền thống' : '☀️ Sáng'))}</button>
         <details className="dropdown" style={{ marginLeft: 'auto' }}>
           <summary className="btn avatar"><span className="circle">{(localStorage.getItem('username')||'N')[0].toUpperCase()}</span> {(localStorage.getItem('username')||'Người dùng')} ▾</summary>
           <div className="dropdown-menu">
@@ -84,9 +85,11 @@ export default function App() {
                 ? [
                     { key:'dashboard', label:'📊 Tổng quan' },
                     { key:'balanceSheet', label:'📘 Bảng cân đối' },
+                    { key:'finishedStock', label:'🏷️ Thành phẩm' },
                     { key:'season', label:'📅 Theo Đợt' },
                     { key:'sales', label:'🛒 Bán chè' },
                     { key:'purchases', label:'📥 Nhập chè' },
+                    { key:'finishedStock', label:'🏷️ Thành phẩm' },
                     { key:'expenses', label:'🧾 Chi phí' },
                     { key:'debts', label:'💳 Công nợ' },
                     { key:'suppliers', label:'Nhà CC' },
@@ -117,6 +120,7 @@ export default function App() {
       <ToastContainer />
       {tab === 'dashboard' && <Dashboard />}
       {tab === 'balanceSheet' && <BalanceSheet />}
+      {tab === 'finishedStock' && <FinishedStock />}
       {tab === 'season' && <Season />}
       {tab === 'sales' && <Sales />}
       {tab === 'purchases' && <Purchases />}
