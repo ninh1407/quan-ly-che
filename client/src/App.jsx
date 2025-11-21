@@ -89,7 +89,6 @@ export default function App() {
                     { key:'season', label:'📅 Theo Đợt' },
                     { key:'sales', label:'🛒 Bán chè' },
                     { key:'purchases', label:'📥 Nhập chè' },
-                    { key:'finishedStock', label:'🏷️ Thành phẩm' },
                     { key:'expenses', label:'🧾 Chi phí' },
                     { key:'debts', label:'💳 Công nợ' },
                     { key:'suppliers', label:'Nhà CC' },

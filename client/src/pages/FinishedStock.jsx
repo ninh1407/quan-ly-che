@@ -16,6 +16,7 @@ export default function FinishedStock() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({ entry_date: '', tea_type: '', weight: '', unit_cost: '', note: '' })
+  const [selectedDay, setSelectedDay] = useState('all')
 
   const monthOptions = useMemo(() => Array.from({ length: 12 }, (_, i) => i + 1), [])
   const yearOptions = useMemo(() => { const y = new Date().getFullYear(); return Array.from({ length: 5 }, (_, i) => y - 2 + i) }, [])
@@ -24,12 +25,18 @@ export default function FinishedStock() {
     setLoading(true); setError('')
     try {
       const r = await api.get('/finished-stock', { params: { month, year } })
-      setItems(r.data || [])
+      let arr = r.data || []
+      if (selectedDay !== 'all') {
+        const dd = String(selectedDay).padStart(2,'0')
+        const dateStr = `${year}-${String(month).padStart(2,'0')}-${dd}`
+        arr = arr.filter(x => String(x.entry_date) === dateStr)
+      }
+      setItems(arr)
     } catch (e) {
       setError(e?.response?.data?.message || 'Tải thành phẩm lỗi')
     } finally { setLoading(false) }
   }
-  useEffect(() => { load() }, [month, year])
+  useEffect(() => { load() }, [month, year, selectedDay])
 
   const submit = async () => {
     try {
@@ -63,6 +70,13 @@ export default function FinishedStock() {
           <span>Năm</span>
           <select value={year} onChange={(e) => setYear(Number(e.target.value))} style={{ width:110 }}>
             {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+        <div className="inline" style={{ display:'flex', gap:6, alignItems:'center' }}>
+          <span>Ngày</span>
+          <select value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)} style={{ width:110 }}>
+            <option value="all">Tất cả</option>
+            {Array.from({ length: new Date(year, month, 0).getDate() }, (_, i) => i + 1).map(d => (<option key={d} value={String(d)}>{d}</option>))}
           </select>
         </div>
         {error && <div className="error">{error}</div>}
