@@ -2122,6 +2122,36 @@ app.post('/admin/restore', requireAdmin, (req, res) => {
   })
 })
 
+app.post('/admin/wipe', requireAdmin, async (req, res) => {
+  const { confirm } = req.body || {}
+  if (String(confirm || '').toUpperCase() !== 'DELETE') return res.status(400).json({ message: 'Missing confirm=DELETE' })
+  const result = { cleared: [], files_removed: 0 }
+  try {
+    if (MONGO_READY) {
+      const cols = await mongoDb.listCollections().toArray()
+      await Promise.all(cols.map(c => mongoDb.collection(c.name).deleteMany({})))
+      result.cleared = cols.map(c => c.name)
+    } else if (SQLITE_READY) {
+      const tables = ['sales','purchases','expenses','customers','suppliers','staff','finished_stock','chat_messages','security_logs']
+      await new Promise((resolve) => db.serialize(() => { db.run('BEGIN'); tables.forEach(t => db.run(`DELETE FROM ${t}`)); db.run('COMMIT', resolve) }))
+      result.cleared = tables
+      try { await new Promise((resolve) => db.run('VACUUM', resolve)) } catch {}
+    } else {
+      return res.status(500).json({ message: 'No storage backend ready' })
+    }
+    try {
+      if (!fs.existsSync(ENC_DIR)) fs.mkdirSync(ENC_DIR)
+      const files = fs.readdirSync(ENC_DIR)
+      for (const f of files) { try { fs.unlinkSync(path.join(ENC_DIR, f)) } catch {} }
+      result.files_removed = files.length
+    } catch {}
+    auditLog('system', 0, 'wipe', req, result)
+    res.json({ ok: true, ...result })
+  } catch (e) {
+    res.status(500).json({ message: 'Wipe error', detail: e.message })
+  }
+})
+
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

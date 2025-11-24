@@ -82,6 +82,8 @@ export default function Admin() {
   useEffect(() => { loadBackups() }, [])
   const createBackup = async () => { try { const r = await api.post('/admin/backup'); await loadBackups(); alert(`Đã sao lưu: ${r.data?.name}`) } catch (e) { setError(e?.response?.data?.message || 'Sao lưu lỗi') } }
   const restoreBackup = async (name) => { if (!window.confirm(`Khôi phục từ ${name}?`)) return; try { await api.post('/admin/restore', { name }); alert('Khôi phục xong, vui lòng tải lại trang'); } catch (e) { setError(e?.response?.data?.message || 'Khôi phục lỗi') } }
+  const [wipeConfirm, setWipeConfirm] = useState('')
+  const wipeAll = async () => { if (String(wipeConfirm).toUpperCase() !== 'DELETE') { alert('Nhập DELETE để xác nhận'); return } try { const r = await api.post('/admin/wipe', { confirm: 'DELETE' }); alert(`Đã xóa toàn bộ dữ liệu. Xóa ${r.data?.cleared?.length||0} bảng, ${r.data?.files_removed||0} ảnh.`) } catch (e) { setError(e?.response?.data?.message || 'Xóa dữ liệu lỗi') } }
 
   return (
     <div className="card">
@@ -200,6 +202,15 @@ export default function Admin() {
           </table>
         </div>
         <div className="muted" style={{ marginTop:8 }}>Hệ thống tự sao lưu hàng ngày. Khôi phục xong cần tải lại trang để kết nối DB mới.</div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <div style={{ fontWeight:700, marginBottom:8, color:'#c62828' }}>Xóa toàn bộ dữ liệu</div>
+        <div className="form">
+          <label>Nhập DELETE để xác nhận</label>
+          <input value={wipeConfirm} onChange={(e)=> setWipeConfirm(e.target.value)} />
+          <button className="btn" onClick={wipeAll}>Xóa dữ liệu</button>
+        </div>
       </div>
     </div>
   )

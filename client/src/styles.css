@@ -219,6 +219,7 @@ html{scroll-behavior:smooth}
 .input-icon{position:relative}
 .input-icon .icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);opacity:.7}
 .input-icon input{padding-left:36px}
+.input-icon select{padding-left:36px}
 .login-form{display:flex;flex-direction:column;gap:12px}
 .field label{display:block;margin-bottom:6px;font-weight:700}
 .login-actions{display:flex;gap:8;align-items:center;margin-top:6px}
@@ -236,3 +237,15 @@ html{scroll-behavior:smooth}
 [data-theme="wood"] .btn.primary{background:#9A4F2E;border-color:#9A4F2E}
 [data-theme="wood"] .btn.primary:hover{background:#5A3E2B}
 [data-theme="wood"] h1{background:var(--primary)}
+.page{background:#FAF8F2}
+.header h2{display:flex;align-items:center;gap:8px;font-weight:800}
+.summary-card{background:#FFF7ED;border:none;border-radius:18px;box-shadow:0 6px 16px rgba(0,0,0,.06);padding:24px}
+.summary-card ul{list-style:none;padding:0;margin:0}
+.summary-card li{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px dashed rgba(0,0,0,.06)}
+.summary-card li:last-child{border-bottom:none}
+.form-card{border:none;border-radius:18px;box-shadow:0 6px 16px rgba(0,0,0,.06);padding:24px;background:#F8F6F1}
+.form-2col{display:grid;grid-template-columns:repeat(2,minmax(240px,1fr));gap:12px;align-items:center}
+.cost-card{background:#FFFFFF;border:none;border-radius:20px;box-shadow:0 4px 12px rgba(0,0,0,.06);padding:20px}
+.cost-card h3,.cost-card h2{display:flex;align-items:center;gap:8px}
+.btn.primary{background:#A65A2B;color:#fff;border-color:#A65A2B}
+.btn.primary:hover{background:#8b4e26}

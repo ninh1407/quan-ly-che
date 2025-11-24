@@ -70,7 +70,7 @@ export default function Expenses() {
       const costRevenuePct = revenueMonth>0 ? (total/revenueMonth)*100 : 0
       let profitMonth = 0
       try { const d = await api.get('/dashboard', { params }); profitMonth = Number(d.data?.netProfit||0) } catch {}
-      setSummary({ total, paid, unpaid, overdue7, overdue30, liability, cashOut, fixedPct, variablePct, costRevenuePct, profitMonth, revenueMonth })
+      setSummary({ total, paid, unpaid, overdue7, overdue30, liability, cashOut, fixedPct, variablePct, fixedSum, variableSum, costRevenuePct, profitMonth, revenueMonth })
     } catch (e) { setError(e?.response?.data?.message || 'Tải chi phí lỗi'); }
     finally { setLoading(false); }
   };
@@ -178,6 +178,34 @@ export default function Expenses() {
     w.document.close(); w.focus(); w.print();
   };
 
+  const markPaid = async (row) => {
+    try {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.capture = 'environment';
+      input.onchange = async (e) => {
+        const f = e.target.files && e.target.files[0]; if (!f) return;
+        const MAX = 5 * 1024 * 1024; if (f.size > MAX) { setError('Ảnh phải nhỏ hơn 5MB'); return; }
+        try {
+          let payload = {};
+          if (f.size > 1024*1024) {
+            const out = await compressImage(f);
+            payload = { receipt_data: out.data, receipt_name: out.name };
+          } else {
+            const r = new FileReader();
+            payload = await new Promise((resolve) => { r.onload = () => resolve({ receipt_data: r.result, receipt_name: f.name }); r.readAsDataURL(f); });
+          }
+          await api.put(`/expenses/${row.id}`, payload);
+          await load();
+        } catch (err) {
+          setError(err?.response?.data?.message || 'Đánh dấu đã chi lỗi');
+        }
+      };
+      input.click();
+    } catch {}
+  };
+
   return (
     <div className="card">
       <h2>Quản lý Chi phí</h2>
@@ -196,36 +224,36 @@ export default function Expenses() {
         <table className="table compact">
           <thead><tr><th>CHI PHÍ (Cost Summary)</th><th className="num">Giá trị</th></tr></thead>
           <tbody>
-            <tr><td>Tổng chi phí tháng</td><td className="num">{fmtMoney(list.reduce((s,r)=> s + (Number(r.amount)||0), 0))}</td></tr>
-            <tr><td>Đã thanh toán</td><td className="num">{fmtMoney(list.filter(r=> !!r.receipt_path).reduce((s,r)=> s + (Number(r.amount)||0), 0))}</td></tr>
-            <tr><td>Chưa thanh toán</td><td className="num">{fmtMoney(list.filter(r=> !r.receipt_path).reduce((s,r)=> s + (Number(r.amount)||0), 0))}</td></tr>
-            <tr><td>Chi phí cố định</td><td className="num">{fmtMoney(list.filter(r=> String(r.category||'').toLowerCase().includes('định')).reduce((s,r)=> s + (Number(r.amount)||0), 0))}</td></tr>
-            <tr><td>Chi phí biến phí</td><td className="num">{fmtMoney(list.filter(r=> String(r.category||'').toLowerCase().includes('biến')).reduce((s,r)=> s + (Number(r.amount)||0), 0))}</td></tr>
+            <tr><td>Tổng chi phí tháng</td><td className="num">{fmtMoney(summary.total)}</td></tr>
+            <tr><td>Đã thanh toán</td><td className="num">{fmtMoney(summary.paid)}</td></tr>
+            <tr><td>Chưa thanh toán</td><td className="num">{fmtMoney(summary.unpaid)}</td></tr>
+            <tr><td>Chi phí cố định</td><td className="num">{fmtMoney(summary.fixedSum||0)}</td></tr>
+            <tr><td>Chi phí biến phí</td><td className="num">{fmtMoney(summary.variableSum||0)}</td></tr>
           </tbody>
         </table>
       </div>
 
-      <form onSubmit={onSubmit} className="form">
+      <form onSubmit={onSubmit} className="form form-2col">
         <label>Ngày</label>
-        <input type="date" value={form.expense_date} onChange={(e) => change('expense_date', e.target.value)} />
+        <div className="input-icon"><span className="icon">📅</span><input type="date" value={form.expense_date} onChange={(e) => change('expense_date', e.target.value)} /></div>
         <label>Mô tả</label>
-        <input value={form.description} onChange={(e) => change('description', e.target.value)} />
+        <div className="input-icon"><span className="icon">📝</span><input value={form.description} onChange={(e) => change('description', e.target.value)} /></div>
         <label>Loại chi phí</label>
-        <select value={form.category} onChange={(e) => change('category', e.target.value)}>
+        <div className="input-icon"><span className="icon">📌</span><select value={form.category} onChange={(e) => change('category', e.target.value)}>
           <option value="Biến phí">Biến phí</option>
           <option value="Định phí">Định phí</option>
           <option value="Thuế">Thuế</option>
           <option value="Trả trước">Trả trước</option>
           <option value="Khác">Khác</option>
-        </select>
+        </select></div>
         
         <label>Trạng thái</label>
-        <select value={paidStatus} onChange={(e)=> setPaidStatus(e.target.value)}>
+        <div className="input-icon"><span className="icon">🏷️</span><select value={paidStatus} onChange={(e)=> setPaidStatus(e.target.value)}>
           <option value="pending">Chờ</option>
           <option value="paid">Đã chi</option>
-        </select>
+        </select></div>
         <label>Số tiền</label>
-        <input value={form.amount} onChange={(e) => change('amount', e.target.value)} />
+        <div className="input-icon"><span className="icon">₫</span><input value={form.amount} onChange={(e) => change('amount', e.target.value)} /></div>
       <label>Ảnh giao dịch (để đánh dấu đã chi, &lt;5MB)</label>
       <input type="file" accept="image/*" capture="environment" onChange={onFile} />
       {imgWarn.length>0 && <div className="error" style={{ marginTop:6 }}>{imgWarn.join(' • ')}</div>}
@@ -259,8 +287,8 @@ export default function Expenses() {
               <div className="table-wrap">
                 <table className="table">
                   <thead>
-                <tr>
-                      <th>Ngày</th><th>Mô tả</th><th>Người tạo</th><th className="num">Số tiền</th><th>TT</th><th>Ảnh</th><th>Hành động</th>
+                    <tr>
+                      <th>Ngày</th><th>Khoản mục</th><th className="num">Số tiền</th><th>Trạng thái</th><th>Ảnh</th><th>Hành động</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -269,10 +297,11 @@ export default function Expenses() {
                         <td>{r.expense_date}</td>
                         <td>{r.description}</td>
                         <td className="num">{fmtMoney(r.amount)}</td>
+                        <td>{r.receipt_path ? <span className="pill paid">Đã chi</span> : <span className="pill pending">Chờ</span>}</td>
                         <td>{r.receipt_path ? <a href={receiptEndpoint('expenses', r.id)} target="_blank" rel="noreferrer">Xem</a> : ''}</td>
-                        <td>{r.owner || ''}</td>
                         <td>
-                          {hasRole('admin') && <button className="btn" onClick={() => editRow(r)}>Sửa</button>}
+                          {hasRole('admin') && !r.receipt_path && <button className="btn" onClick={() => markPaid(r)}>Đã chi</button>}
+                          {hasRole('admin') && <button className="btn" style={{ marginLeft: 6 }} onClick={() => editRow(r)}>Sửa</button>}
                           {hasRole('admin') && <button className="btn" style={{ marginLeft: 6 }} onClick={() => deleteRow(r.id)}>Xóa</button>}
                         </td>
                       </tr>
@@ -286,8 +315,8 @@ export default function Expenses() {
               <div className="table-wrap">
                 <table className="table">
                   <thead>
-                <tr>
-                      <th>Ngày</th><th>Mô tả</th><th>Người tạo</th><th className="num">Số tiền</th><th>TT</th><th>Ảnh</th><th>Hành động</th>
+                    <tr>
+                      <th>Ngày</th><th>Khoản mục</th><th className="num">Số tiền</th><th>Trạng thái</th><th>Ảnh</th><th>Hành động</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -295,11 +324,12 @@ export default function Expenses() {
                       <tr key={`v${r.id}`}>
                         <td>{r.expense_date}</td>
                         <td>{r.description}</td>
-                        <td>{r.category||''}</td>
                         <td className="num">{fmtMoney(r.amount)}</td>
+                        <td>{r.receipt_path ? <span className="pill paid">Đã chi</span> : <span className="pill pending">Chờ</span>}</td>
                         <td>{r.receipt_path ? <a href={receiptEndpoint('expenses', r.id)} target="_blank" rel="noreferrer">Xem</a> : ''}</td>
                         <td>
-                          {hasRole('admin') && <button className="btn" onClick={() => editRow(r)}>Sửa</button>}
+                          {hasRole('admin') && !r.receipt_path && <button className="btn" onClick={() => markPaid(r)}>Đã chi</button>}
+                          {hasRole('admin') && <button className="btn" style={{ marginLeft: 6 }} onClick={() => editRow(r)}>Sửa</button>}
                           {hasRole('admin') && <button className="btn" style={{ marginLeft: 6 }} onClick={() => deleteRow(r.id)}>Xóa</button>}
                         </td>
                       </tr>
