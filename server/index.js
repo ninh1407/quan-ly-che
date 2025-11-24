@@ -9,6 +9,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const app = express();
+const BACKUPS_DIR = process.env.BACKUPS_DIR || path.join(__dirname, 'backups');
 const ALLOWED_ORIGIN = process.env.CORS_ORIGIN || ''
 app.use((req, res, next) => {
   const origin = String(req.headers.origin || '')
@@ -59,8 +60,7 @@ if (SQLITE_READY) {
 
 function ensureBackupDir() {
   try { 
-    const backupsDir = path.join(__dirname, 'backups');
-    if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir) 
+    if (!fs.existsSync(BACKUPS_DIR)) fs.mkdirSync(BACKUPS_DIR, { recursive: true }) 
   } catch {}
 }
 function timestamp() {
@@ -93,21 +93,18 @@ function pruneBackupsByDays(days) {
 function backupSqliteNow() {
   ensureBackupDir();
   const name = `sqlite-${timestamp()}.db`;
-  const backupsDir = path.join(__dirname, 'backups');
-  const src = dbPath; const dest = path.join(backupsDir, name);
+  const src = dbPath; const dest = path.join(BACKUPS_DIR, name);
   fs.copyFileSync(src, dest);
   pruneBackupsByDays(3);
   return name;
 }
 function backupSqliteList() {
   ensureBackupDir();
-  const backupsDir = path.join(__dirname, 'backups');
-  return fs.readdirSync(backupsDir).filter(f => f.endsWith('.db')).sort((a,b)=> b.localeCompare(a));
+  return fs.readdirSync(BACKUPS_DIR).filter(f => f.endsWith('.db') || f.endsWith('.json')).sort((a,b)=> b.localeCompare(a));
 }
 function restoreSqlite(name, cb) {
   try {
-    const backupsDir = path.join(__dirname, 'backups');
-    const src = path.join(backupsDir, name);
+    const src = path.join(BACKUPS_DIR, name);
     if (!fs.existsSync(src)) return cb(new Error('Backup not found'));
     if (SQLITE_READY) {
       try { db.close(); } catch {}
@@ -123,8 +120,39 @@ function restoreSqlite(name, cb) {
     cb(e);
   }
 }
-setTimeout(() => { try { if (SQLITE_READY) backupSqliteNow(); } catch {} }, 5_000);
-setInterval(() => { try { if (SQLITE_READY) backupSqliteNow(); } catch {} }, 24*3600*1000);
+async function backupMongoNow() {
+  ensureBackupDir();
+  const name = `mongo-${timestamp()}.json`;
+  const dest = path.join(BACKUPS_DIR, name);
+  const cols = await mongoDb.listCollections().toArray();
+  const out = {};
+  for (const c of cols) {
+    try { out[c.name] = await mongoDb.collection(c.name).find({}).toArray(); }
+    catch { out[c.name] = []; }
+  }
+  fs.writeFileSync(dest, JSON.stringify(out, null, 2));
+  pruneBackupsByDays(3);
+  return name;
+}
+function restoreMongo(name) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const src = path.join(BACKUPS_DIR, name);
+      if (!fs.existsSync(src)) return reject(new Error('Backup not found'));
+      const data = JSON.parse(fs.readFileSync(src, 'utf8'));
+      const cols = Object.keys(data||{});
+      const existing = await mongoDb.listCollections().toArray();
+      await Promise.all(existing.map(c => mongoDb.collection(c.name).deleteMany({})));
+      for (const col of cols) {
+        const arr = Array.isArray(data[col]) ? data[col] : [];
+        if (arr.length) await mongoDb.collection(col).insertMany(arr);
+      }
+      resolve();
+    } catch (e) { reject(e); }
+  })
+}
+setTimeout(() => { try { if (MONGO_READY) { backupMongoNow(); } else if (SQLITE_READY) { backupSqliteNow(); } } catch {} }, 5_000);
+setInterval(() => { try { if (MONGO_READY) { backupMongoNow(); } else if (SQLITE_READY) { backupSqliteNow(); } } catch {} }, 24*3600*1000);
 
 let MONGO_READY = false;
 let mongoDb = null;
@@ -2110,16 +2138,16 @@ app.get('/chat/users', requireAuth, (req, res) => {
 app.get('/admin/backups', requireAdmin, (req, res) => {
   try { res.json(backupSqliteList()) } catch (e) { res.status(500).json({ message: 'Lỗi tải danh sách bản sao lưu', detail: e.message }) }
 })
-app.post('/admin/backup', requireAdmin, (req, res) => {
-  try { const name = backupSqliteNow(); res.json({ name }) } catch (e) { res.status(500).json({ message: 'Lỗi tạo bản sao lưu', detail: e.message }) }
+app.post('/admin/backup', requireAdmin, async (req, res) => {
+  try { const name = MONGO_READY ? await backupMongoNow() : backupSqliteNow(); res.json({ name }) } catch (e) { res.status(500).json({ message: 'Lỗi tạo bản sao lưu', detail: e.message }) }
 })
-app.post('/admin/restore', requireAdmin, (req, res) => {
+app.post('/admin/restore', requireAdmin, async (req, res) => {
   const { name } = req.body || {};
   if (!name) return res.status(400).json({ message: 'Thiếu tên bản sao lưu' })
-  restoreSqlite(String(name), (err) => {
-    if (err) return res.status(500).json({ message: 'Khôi phục lỗi', detail: err.message })
-    res.json({ ok: true })
-  })
+  try {
+    if (String(name).endsWith('.json') && MONGO_READY) { await restoreMongo(String(name)); return res.json({ ok: true }) }
+    restoreSqlite(String(name), (err) => { if (err) return res.status(500).json({ message: 'Khôi phục lỗi', detail: err.message }); res.json({ ok: true }) })
+  } catch (e) { res.status(500).json({ message: 'Khôi phục lỗi', detail: e.message }) }
 })
 
 app.post('/admin/wipe', requireAdmin, async (req, res) => {
