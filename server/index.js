@@ -72,7 +72,7 @@ function timestamp() {
 function pruneBackupsByDays(days) {
   try {
     ensureBackupDir();
-    const files = fs.readdirSync('backups').filter(f => f.startsWith('sqlite-') && f.endsWith('.db'))
+    const files = fs.readdirSync(BACKUPS_DIR).filter(f => f.startsWith('sqlite-') && f.endsWith('.db'))
     const keepSet = new Set();
     const now = new Date();
     for (let i = 0; i < days; i++) {
@@ -85,9 +85,20 @@ function pruneBackupsByDays(days) {
       const dayStr = m && m[1] ? m[1] : null;
       if (!dayStr) return;
       if (!keepSet.has(dayStr)) {
-        try { fs.unlinkSync(`backups/${f}`) } catch {}
+        try { fs.unlinkSync(path.join(BACKUPS_DIR, f)) } catch {}
       }
     })
+  } catch {}
+}
+function pruneBackupsByCount(count) {
+  try {
+    ensureBackupDir();
+    const files = fs.readdirSync(BACKUPS_DIR)
+      .filter(f => f.endsWith('.db') || f.endsWith('.json'))
+      .sort((a,b)=> b.localeCompare(a));
+    for (let i = count; i < files.length; i++) {
+      try { fs.unlinkSync(path.join(BACKUPS_DIR, files[i])) } catch {}
+    }
   } catch {}
 }
 function backupSqliteNow() {
@@ -95,7 +106,7 @@ function backupSqliteNow() {
   const name = `sqlite-${timestamp()}.db`;
   const src = dbPath; const dest = path.join(BACKUPS_DIR, name);
   fs.copyFileSync(src, dest);
-  pruneBackupsByDays(3);
+  pruneBackupsByCount(3);
   return name;
 }
 function backupSqliteList() {
@@ -131,7 +142,7 @@ async function backupMongoNow() {
     catch { out[c.name] = []; }
   }
   fs.writeFileSync(dest, JSON.stringify(out, null, 2));
-  pruneBackupsByDays(3);
+  pruneBackupsByCount(3);
   return name;
 }
 function restoreMongo(name) {

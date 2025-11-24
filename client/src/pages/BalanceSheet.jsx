@@ -143,11 +143,13 @@ export default function BalanceSheet() {
       ;(pendPurch||[]).forEach(r => { const k = String(r.supplier_name||''); const v = Number(r.total_cost != null ? r.total_cost : (Number(r.unit_price||0)*Number((r.net_weight ?? r.weight) || 0))); payablesBySupplierMap.set(k, (payablesBySupplierMap.get(k)||0)+v) })
       const payablesBySupplier = Array.from(payablesBySupplierMap.entries()).map(([name,amount])=>({ name, amount }))
       const pendingCosts = (expAll||[]).filter(r => !r.receipt_path).reduce((s,r)=> s + Number(r.amount||0), 0)
+      const prepaidExpenses = (expAll||[]).filter(r => String(r.category||'').toLowerCase().includes('trả trước')).reduce((s,r)=> s + Number(r.amount||0), 0)
+      const taxes = (expAll||[]).filter(r => String(r.category||'').toLowerCase().includes('thuế')).reduce((s,r)=> s + Number(r.amount||0), 0)
       const cumulativeProfit = salesGlobal.reduce((s,r)=> s + Number(r.total_amount != null ? r.total_amount : (Number(r.price_per_kg||0)*Number(r.weight||0))), 0) - purchGlobal.reduce((s,r)=> s + Number(r.total_cost != null ? r.total_cost : (Number(r.unit_price||0)*Number((r.net_weight ?? r.weight) || 0))), 0) - expGlobal.reduce((s,r)=> s + Number(r.amount||0), 0)
       setData({ receivables, payables, inventoryWeight, inventoryValue, netProfit, cashflowNet,
         receivablesByAging, receivablesByCustomer, payablesByAging, payablesBySupplier,
         openingStock, periodIn, periodOut, closingStock,
-        prepaidExpenses: 0, pendingCosts, taxes: 0, shortTermLoans: 0, longTermLoans: 0,
+        prepaidExpenses, pendingCosts, taxes, shortTermLoans: 0, longTermLoans: 0,
         cumulativeProfit,
       })
     } catch (e) {
@@ -166,9 +168,10 @@ export default function BalanceSheet() {
   }, [month, year])
 
   const assetsTotal = Number(data.receivables||0) + Number(data.inventoryValue||0) + Math.max(0, Number(data.cashflowNet||0)) + Number(data.prepaidExpenses||0)
-  const liabilitiesTotal = Number(data.payables||0)
+  const liabilitiesTotal = Number(data.payables||0) + Number(data.pendingCosts||0) + Number(data.taxes||0) + Number(data.shortTermLoans||0) + Number(data.longTermLoans||0)
   const equityTotal = Number(data.netProfit||0)
-  const balanceOk = Math.abs(assetsTotal - (liabilitiesTotal + equityTotal)) < 1
+  const equityTotalAll = equityTotal + Number(initialCapital||0)
+  const balanceOk = Math.abs(assetsTotal - (liabilitiesTotal + equityTotalAll)) < 1
 
   return (
     <div className="card">
@@ -254,7 +257,7 @@ export default function BalanceSheet() {
               </tr>
               <tr>
                 <td>Chi phí trả trước: {fmtMoney(data.prepaidExpenses)}</td>
-                <td></td>
+                <td>Chi phí phải trả: {fmtMoney(data.pendingCosts)}</td>
               </tr>
               <tr>
                 <td style={{ fontWeight:700 }}>Tài sản dài hạn</td>
@@ -303,7 +306,7 @@ export default function BalanceSheet() {
                   <tr><td>Vốn góp ban đầu</td><td className="num">{fmtMoney(initialCapital)}</td></tr>
                   <tr><td>Lợi nhuận giữ lại</td><td className="num">{fmtMoney(Math.max(0, assetsTotal - (liabilitiesTotal + initialCapital)))}</td></tr>
                   <tr><td>Lãi/lỗ lũy kế</td><td className="num">{fmtMoney(data.cumulativeProfit)}</td></tr>
-                  <tr style={{ fontWeight:700 }}><td>Tổng nợ + vốn</td><td className="num">{fmtMoney(liabilitiesTotal + equityTotal)}</td></tr>
+                  <tr style={{ fontWeight:700 }}><td>Tổng nợ + vốn</td><td className="num">{fmtMoney(liabilitiesTotal + equityTotalAll)}</td></tr>
                 </tbody>
               </table>
               <div className={balanceOk ? 'muted' : 'error'} style={{ marginTop:6 }}>{balanceOk ? 'Cân đối' : 'Chênh lệch nhỏ do ước tính tồn/tiền mặt'}</div>
