@@ -285,10 +285,7 @@ export default function Purchases() {
         <label>Biển số xe cân</label>
         <input value={form.vehicle_plate} onChange={(e) => change('vehicle_plate', e.target.value)} />
         <label>Nhà cung cấp</label>
-        <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-          <input list="suppliersList" value={form.supplier_name} onChange={(e) => { const name = e.target.value; setForm(s=> ({ ...s, supplier_name: name })); const list = (recentPurchases||[]).filter(r => String(r.supplier_name||'')===name); if (list.length) { const avg = Math.round(list.reduce((sum, r) => sum + Number(r.unit_price||0), 0) / list.length); setForm(s => ({ ...s, unit_price: formatMoneyInput(String(avg)) })) } }} />
-          <button className="btn" type="button" onClick={async ()=> { const name=String(form.supplier_name||'').trim(); if(!name){ setError('Nhập tên nhà cung cấp trước khi thêm'); return } try{ await api.post('/suppliers',{ name, phone:'', address:'', note:'' }); const r=await api.get('/suppliers'); setSuppliers(r.data||[]); alert('Đã thêm nhà cung cấp'); } catch(e){ setError(e?.response?.data?.message||'Thêm nhà cung cấp lỗi') } }}>Thêm</button>
-        </div>
+        <input list="suppliersList" value={form.supplier_name} onChange={(e) => { const name = e.target.value; setForm(s=> ({ ...s, supplier_name: name })); const list = (recentPurchases||[]).filter(r => String(r.supplier_name||'')===name); if (list.length) { const avg = Math.round(list.reduce((sum, r) => sum + Number(r.unit_price||0), 0) / list.length); setForm(s => ({ ...s, unit_price: formatMoneyInput(String(avg)) })) } }} />
         <datalist id="suppliersList">
           {suppliers.map(s => <option key={s.id} value={s.name} />)}
         </datalist>

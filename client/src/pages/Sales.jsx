@@ -327,7 +327,6 @@ export default function Sales() {
           {staff.filter(x => !x.role || x.role === 'seller').map(x => <option key={`s${x.id}`} value={x.name} />)}
         </datalist>
       <label>Khách hàng</label>
-      <div style={{ display:'flex', gap:6, alignItems:'center' }}>
       <input list="customersList" value={form.customer_name} onChange={(e) => {
         const name = e.target.value
         const found = customers.find(c => c.name === name)
@@ -338,8 +337,6 @@ export default function Sales() {
           setForm(s => ({ ...s, price_per_kg: formatMoneyInput(String(avg)) }))
         }
       }} />
-      <button className="btn" type="button" onClick={async ()=> { const name=String(form.customer_name||'').trim(); if(!name){ setError('Nhập tên người mua trước khi thêm'); return } try{ await api.post('/customers',{ name, phone:'', address:'', note:'' }); const r=await api.get('/customers'); setCustomers(r.data||[]); alert('Đã thêm người mua'); } catch(e){ setError(e?.response?.data?.message||'Thêm người mua lỗi') } }}>Thêm</button>
-      </div>
         <datalist id="customersList">
           {customers.map(c => <option key={c.id} value={c.name} />)}
         </datalist>
