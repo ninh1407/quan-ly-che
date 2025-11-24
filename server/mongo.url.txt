@@ -1,1 +1,0 @@
-mongodb+srv://ninhnase151416_db_user:7xIw8Bkj35MG6beF@cluster0.fgqxxhs.mongodb.net/?retryWrites=true&w=majority
