@@ -2247,23 +2247,7 @@ app.delete('/admin/wipe', requireAdmin, async (req, res) => {
   }
 })
 
-app.post('/admin/wipe', requireAdmin, async (req, res) => {
-  try {
-    if (MONGO_READY) {
-      await Promise.all([
-        mongoDb.collection('sales').deleteMany({}),
-        mongoDb.collection('purchases').deleteMany({}),
-        mongoDb.collection('expenses').deleteMany({})
-      ])
-    }
-    await new Promise((resolve, reject) => db.run('DELETE FROM sales', [], (e) => e ? reject(e) : resolve()))
-    await new Promise((resolve, reject) => db.run('DELETE FROM purchases', [], (e) => e ? reject(e) : resolve()))
-    await new Promise((resolve, reject) => db.run('DELETE FROM expenses', [], (e) => e ? reject(e) : resolve()))
-    res.json({ ok: true })
-  } catch (e) {
-    res.status(500).json({ message: 'DB error', detail: e.message })
-  }
-})
+// duplicate simple wipe endpoint removed; use the enhanced /admin/wipe above
 
 // Auth endpoints
 app.post('/auth/login', rateLimit(60_000, 5, 'login'), (req, res) => {

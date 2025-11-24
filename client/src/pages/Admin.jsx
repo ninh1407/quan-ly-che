@@ -101,6 +101,15 @@ export default function Admin() {
         <button className="btn primary" type="submit">Lưu user</button>
       </form>
 
+      <div className="card" style={{ marginTop: 16 }}>
+        <div style={{ fontWeight:700, marginBottom:8, color:'#c62828' }}>Xóa toàn bộ dữ liệu</div>
+        <div className="form">
+          <label>Nhập DELETE để xác nhận</label>
+          <input value={wipeConfirm} onChange={(e)=> setWipeConfirm(e.target.value)} />
+          <button className="btn" onClick={wipeAll}>Xóa dữ liệu</button>
+        </div>
+      </div>
+
       <div style={{ marginTop: 16 }}>
         {loading ? 'Đang tải...' : (
           <table className="table">
@@ -204,14 +213,7 @@ export default function Admin() {
         <div className="muted" style={{ marginTop:8 }}>Hệ thống tự sao lưu hàng ngày. Khôi phục xong cần tải lại trang để kết nối DB mới.</div>
       </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <div style={{ fontWeight:700, marginBottom:8, color:'#c62828' }}>Xóa toàn bộ dữ liệu</div>
-        <div className="form">
-          <label>Nhập DELETE để xác nhận</label>
-          <input value={wipeConfirm} onChange={(e)=> setWipeConfirm(e.target.value)} />
-          <button className="btn" onClick={wipeAll}>Xóa dữ liệu</button>
-        </div>
-      </div>
+      
     </div>
   )
 }
