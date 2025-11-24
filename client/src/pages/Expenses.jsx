@@ -190,44 +190,19 @@ export default function Expenses() {
         <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
           {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
-        <button className="btn" style={{ marginLeft: 8 }} onClick={exportCsv} type="button">Xuất CSV</button>
-        <button className="btn" style={{ marginLeft: 8 }} onClick={exportPdf} type="button">Xuất PDF</button>
-        <label style={{ marginLeft: 12 }}>Lọc</label>
-        <input placeholder="Mô tả/nhóm/người tạo" value={query} onChange={(e) => setQuery(e.target.value)} />
       </div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:12 }}>
-        <div className="card">
-          <div style={{ fontWeight:700, marginBottom:6 }}>Trạng thái Chi phí kế toán</div>
-          <div className="table-wrap">
-            <table className="table">
-              <thead><tr><th>Mục</th><th className="num">Giá trị</th></tr></thead>
-              <tbody>
-                <tr><td>Tổng chi phí (tháng)</td><td className="num">{fmtMoney(summary.total)}</td></tr>
-                <tr><td>Đã thanh toán</td><td className="num">{fmtMoney(summary.paid)}</td></tr>
-                <tr><td>Chưa thanh toán</td><td className="num">{fmtMoney(summary.unpaid)}</td></tr>
-                <tr><td>Quá hạn > 7 ngày</td><td className="num">{fmtMoney(summary.overdue7)}</td></tr>
-                <tr><td>Quá hạn > 30 ngày</td><td className="num">{fmtMoney(summary.overdue30)}</td></tr>
-                <tr style={{ fontWeight:700 }}><td>Tổng chi phí phải trả</td><td className="num">{fmtMoney(summary.liability)}</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div className="card">
-          <div style={{ fontWeight:700, marginBottom:6 }}>Ảnh hưởng dòng tiền & vốn chủ</div>
-          <div className="table-wrap">
-            <table className="table">
-              <thead><tr><th>Mục</th><th className="num">Giá trị</th></tr></thead>
-              <tbody>
-                <tr><td>Số tiền chi ra (Cash Outflow)</td><td className="num">{fmtMoney(summary.cashOut)}</td></tr>
-                <tr><td>Tỷ lệ chi phí/doanh thu</td><td className="num">{Math.round(summary.costRevenuePct)}%</td></tr>
-                <tr><td>Tỷ lệ định phí</td><td className="num">{Math.round(summary.fixedPct)}%</td></tr>
-                <tr><td>Tỷ lệ biến phí</td><td className="num">{Math.round(summary.variablePct)}%</td></tr>
-                <tr><td>Lợi nhuận tháng này</td><td className="num">{fmtMoney(summary.profitMonth)}</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+      <div className="table-wrap" style={{ marginTop:12 }}>
+        <table className="table compact">
+          <thead><tr><th>CHI PHÍ (Cost Summary)</th><th className="num">Giá trị</th></tr></thead>
+          <tbody>
+            <tr><td>Tổng chi phí tháng</td><td className="num">{fmtMoney(list.reduce((s,r)=> s + (Number(r.amount)||0), 0))}</td></tr>
+            <tr><td>Đã thanh toán</td><td className="num">{fmtMoney(list.filter(r=> !!r.receipt_path).reduce((s,r)=> s + (Number(r.amount)||0), 0))}</td></tr>
+            <tr><td>Chưa thanh toán</td><td className="num">{fmtMoney(list.filter(r=> !r.receipt_path).reduce((s,r)=> s + (Number(r.amount)||0), 0))}</td></tr>
+            <tr><td>Chi phí cố định</td><td className="num">{fmtMoney(list.filter(r=> String(r.category||'').toLowerCase().includes('định')).reduce((s,r)=> s + (Number(r.amount)||0), 0))}</td></tr>
+            <tr><td>Chi phí biến phí</td><td className="num">{fmtMoney(list.filter(r=> String(r.category||'').toLowerCase().includes('biến')).reduce((s,r)=> s + (Number(r.amount)||0), 0))}</td></tr>
+          </tbody>
+        </table>
       </div>
 
       <form onSubmit={onSubmit} className="form">
@@ -243,30 +218,7 @@ export default function Expenses() {
           <option value="Trả trước">Trả trước</option>
           <option value="Khác">Khác</option>
         </select>
-        {form.category === 'Biến phí' && (
-          <>
-            <label>Khoản (Biến phí)</label>
-            <select value={subCategory} onChange={(e)=> setSubCategory(e.target.value)}>
-              <option value="">-- chọn --</option>
-              {VAR_CATS.map(c => (<option key={c} value={c}>{c}</option>))}
-            </select>
-          </>
-        )}
-        {form.category === 'Định phí' && (
-          <>
-            <label>Khoản (Định phí)</label>
-            <select value={subCategory} onChange={(e)=> setSubCategory(e.target.value)}>
-              <option value="">-- chọn --</option>
-              {FIX_CATS.map(c => (<option key={c} value={c}>{c}</option>))}
-            </select>
-          </>
-        )}
-        <label>Ảnh hưởng kế toán</label>
-        <select value={acctImpact} onChange={(e)=> { const v = e.target.value; setAcctImpact(v); setPaidStatus(v==='cash'?'paid':'pending') }}>
-          <option value="cash">Tiền mặt (đã chi)</option>
-          <option value="liability">Nợ phải trả (chưa thanh toán)</option>
-          <option value="prepaid">Trả trước (ghi tài sản)</option>
-        </select>
+        
         <label>Trạng thái</label>
         <select value={paidStatus} onChange={(e)=> setPaidStatus(e.target.value)}>
           <option value="pending">Chờ</option>
@@ -312,20 +264,13 @@ export default function Expenses() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(query ? list.filter(r => {
-                      const s = query.toLowerCase();
-                      const cat = String(r.category||'')
-                      const isFix = FIX_CATS.includes(cat) || cat.toLowerCase().includes('định')
-                      if (!isFix) return false;
-                      return [r.description, r.category, r.owner].some(v => String(v||'').toLowerCase().includes(s))
-                    }) : list.filter(r => String(r.category||'').toLowerCase().includes('định'))).map(r => (
+                    {list.filter(r => String(r.category||'').toLowerCase().includes('định')).map(r => (
                       <tr key={`f${r.id}`}>
                         <td>{r.expense_date}</td>
                         <td>{r.description}</td>
-                        <td>{r.owner || ''}</td>
                         <td className="num">{fmtMoney(r.amount)}</td>
-                        <td><span className={`pill ${r.receipt_path ? 'paid':'pending'}`}>{r.receipt_path?'Đã chi':'Chờ'}</span></td>
                         <td>{r.receipt_path ? <a href={receiptEndpoint('expenses', r.id)} target="_blank" rel="noreferrer">Xem</a> : ''}</td>
+                        <td>{r.owner || ''}</td>
                         <td>
                           {hasRole('admin') && <button className="btn" onClick={() => editRow(r)}>Sửa</button>}
                           {hasRole('admin') && <button className="btn" style={{ marginLeft: 6 }} onClick={() => deleteRow(r.id)}>Xóa</button>}
@@ -346,19 +291,12 @@ export default function Expenses() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(query ? list.filter(r => {
-                      const s = query.toLowerCase();
-                      const cat = String(r.category||'')
-                      const isVar = VAR_CATS.includes(cat) || cat.toLowerCase().includes('biến')
-                      if (!isVar) return false;
-                      return [r.description, r.category, r.owner].some(v => String(v||'').toLowerCase().includes(s))
-                    }) : list.filter(r => { const cat = String(r.category||''); return VAR_CATS.includes(cat) || cat.toLowerCase().includes('biến') })).map(r => (
+                    {list.filter(r => { const cat = String(r.category||''); return VAR_CATS.includes(cat) || cat.toLowerCase().includes('biến') }).map(r => (
                       <tr key={`v${r.id}`}>
                         <td>{r.expense_date}</td>
                         <td>{r.description}</td>
-                        <td>{r.owner || ''}</td>
+                        <td>{r.category||''}</td>
                         <td className="num">{fmtMoney(r.amount)}</td>
-                        <td><span className={`pill ${r.receipt_path ? 'paid':'pending'}`}>{r.receipt_path?'Đã chi':'Chờ'}</span></td>
                         <td>{r.receipt_path ? <a href={receiptEndpoint('expenses', r.id)} target="_blank" rel="noreferrer">Xem</a> : ''}</td>
                         <td>
                           {hasRole('admin') && <button className="btn" onClick={() => editRow(r)}>Sửa</button>}
@@ -366,8 +304,8 @@ export default function Expenses() {
                         </td>
                       </tr>
                     ))}
-                  </tbody>
-                </table>
+                </tbody>
+              </table>
               </div>
             </div>
           </div>
