@@ -5,7 +5,6 @@ import Expenses from './pages/Expenses.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import BalanceSheet from './pages/BalanceSheet.jsx'
 import FinishedStock from './pages/FinishedStock.jsx'
-import Calendar from './pages/Calendar.jsx'
 import Season from './pages/Season.jsx'
 import Suppliers from './pages/Suppliers.jsx'
 import Customers from './pages/Customers.jsx'
@@ -33,9 +32,8 @@ export default function App() {
   const rolesRaw = (() => { try { const r = JSON.parse(localStorage.getItem('roles')||'null'); if (Array.isArray(r)) return r; } catch {} const s = (localStorage.getItem('role')||'user'); return String(s).split(',').map(x=>x.trim()).filter(Boolean) })()
   const hasRole = (name) => rolesRaw.includes(name)
   const allowedTabs = hasRole('admin')
-    ? ['dashboard','balanceSheet','finishedStock','calendar','sales','purchases','expenses','debts','season','suppliers','customers','staff','changePwd','admin','stats','tradeStats']
+    ? ['dashboard','balanceSheet','finishedStock','sales','purchases','expenses','debts','season','changePwd','admin','stats','tradeStats']
     : Array.from(new Set([
-        'calendar',
         ...(hasRole('seller') ? ['sales'] : []),
         ...(hasRole('warehouse') ? ['purchases','finishedStock'] : []),
         ...(hasRole('finance') ? ['dashboard','balanceSheet','expenses','debts'] : []),
@@ -87,28 +85,21 @@ export default function App() {
                 ? [
                     { key:'dashboard', label:'📊 Tổng quan' },
                     { key:'balanceSheet', label:'📘 Bảng cân đối' },
-                    { key:'calendar', label:'📆 Lịch' },
                     { key:'finishedStock', label:'🏷️ Thành phẩm' },
                     { key:'season', label:'📅 Theo Đợt' },
                     { key:'sales', label:'🛒 Bán chè' },
                     { key:'purchases', label:'📥 Nhập chè' },
                     { key:'expenses', label:'🧾 Chi phí' },
                     { key:'debts', label:'💳 Công nợ' },
-                    { key:'suppliers', label:'Nhà CC' },
-                    { key:'customers', label:'Người mua' },
-                    { key:'staff', label:'Tạo phiếu/Bán' },
                     { key:'stats', label:'Thống kê' },
                     { key:'tradeStats', label:'Thống kê giao dịch' },
                     { key:'changePwd', label:'Đổi mật khẩu' },
                     { key:'admin', label:'⚙️ Quản trị' }
                   ]
                 : [
-                    { key:'calendar', label:'📆 Lịch' },
                     { key:'sales', label:'🛒 Bán chè' },
                     { key:'purchases', label:'📥 Nhập chè' },
                     { key:'expenses', label:'🧾 Chi phí' },
-                    { key:'suppliers', label:'Nhà CC' },
-                    { key:'customers', label:'Người mua' },
                     { key:'changePwd', label:'Đổi mật khẩu' }
                   ]
             ).map(item => (
@@ -122,7 +113,6 @@ export default function App() {
       <ToastContainer />
       {tab === 'dashboard' && <Dashboard />}
       {tab === 'balanceSheet' && <BalanceSheet />}
-      {tab === 'calendar' && <Calendar />}
       {tab === 'finishedStock' && <FinishedStock />}
       {tab === 'season' && <Season />}
       {tab === 'sales' && <Sales />}
@@ -131,7 +121,6 @@ export default function App() {
       {tab === 'suppliers' && <Suppliers />}
       {tab === 'debts' && <Debts />}
       {tab === 'customers' && <Customers />}
-      {tab === 'staff' && <Staff />}
       {tab === 'changePwd' && <ChangePassword />}
       {tab === 'stats' && <Stats />}
       {tab === 'tradeStats' && <TradeStats />}
