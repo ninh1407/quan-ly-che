@@ -32,7 +32,7 @@ export default function App() {
   const rolesRaw = (() => { try { const r = JSON.parse(localStorage.getItem('roles')||'null'); if (Array.isArray(r)) return r; } catch {} const s = (localStorage.getItem('role')||'user'); return String(s).split(',').map(x=>x.trim()).filter(Boolean) })()
   const hasRole = (name) => rolesRaw.includes(name)
   const allowedTabs = hasRole('admin')
-    ? ['dashboard','balanceSheet','finishedStock','sales','purchases','expenses','debts','season','changePwd','admin','stats','tradeStats']
+    ? ['dashboard','balanceSheet','finishedStock','sales','purchases','expenses','debts','season','suppliers','customers','changePwd','admin','stats','tradeStats']
     : Array.from(new Set([
         ...(hasRole('seller') ? ['sales'] : []),
         ...(hasRole('warehouse') ? ['purchases','finishedStock'] : []),
@@ -91,6 +91,8 @@ export default function App() {
                     { key:'purchases', label:'📥 Nhập chè' },
                     { key:'expenses', label:'🧾 Chi phí' },
                     { key:'debts', label:'💳 Công nợ' },
+                    { key:'suppliers', label:'Nhà CC' },
+                    { key:'customers', label:'Người mua' },
                     { key:'stats', label:'Thống kê' },
                     { key:'tradeStats', label:'Thống kê giao dịch' },
                     { key:'changePwd', label:'Đổi mật khẩu' },

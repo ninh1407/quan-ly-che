@@ -212,7 +212,7 @@ export default function BalanceSheet() {
         </div>
         <div className="inline" style={{ display:'flex', gap:6, alignItems:'center' }}>
           <span>Vốn góp</span>
-          <input type="number" value={initialCapital} onChange={(e)=> { const v = Number(e.target.value||0); setInitialCapital(v); try { localStorage.setItem('initialCapital', String(v)) } catch {} }} />
+          <input type="number" style={{ width:160 }} value={initialCapital} onChange={(e)=> { const v = Number(e.target.value||0); setInitialCapital(v); try { localStorage.setItem('initialCapital', String(v)) } catch {} }} />
         </div>
         <div className="inline" style={{ display:'flex', gap:6, alignItems:'center' }}>
           <span>Kiểu hiển thị</span>

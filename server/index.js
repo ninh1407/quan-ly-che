@@ -9,7 +9,27 @@ const path = require('path');
 const crypto = require('crypto');
 
 const app = express();
-app.use(cors());
+const ALLOWED_ORIGIN = process.env.CORS_ORIGIN || ''
+app.use((req, res, next) => {
+  const origin = String(req.headers.origin || '')
+  if (ALLOWED_ORIGIN) {
+    if (origin && origin === ALLOWED_ORIGIN) res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN)
+  } else if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+  }
+  res.setHeader('Access-Control-Allow-Credentials', 'true')
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+  if (req.method === 'OPTIONS') return res.status(200).end()
+  next()
+})
+app.use((req, res, next) => {
+  res.setHeader('X-Frame-Options', 'DENY')
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('Referrer-Policy', 'no-referrer')
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+  next()
+})
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 try { if (!fs.existsSync('uploads')) fs.mkdirSync('uploads'); } catch {}
@@ -2022,7 +2042,12 @@ app.get('/events', rateLimit(10_000, 3, 'events'), (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
   res.setHeader('Connection', 'keep-alive')
-  res.setHeader('Access-Control-Allow-Origin', '*')
+  const origin = String(req.headers.origin || '')
+  if (ALLOWED_ORIGIN) {
+    if (origin && origin === ALLOWED_ORIGIN) res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN)
+  } else if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+  }
   res.flushHeaders && res.flushHeaders()
   res.write(`event: connected\ndata: ${JSON.stringify({ ok: true })}\n\n`)
   const client = { res, user }
