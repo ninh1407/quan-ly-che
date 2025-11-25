@@ -105,14 +105,7 @@ export default function App() {
                     { key:'changePwd', label:'🔑 Đổi mật khẩu' }
                   ]
             ).map(item => (
-              <button key={item.key} className={`btn ${tab===item.key?'primary':''}`} onClick={() => { go(item.key); setMenuOpen(false) }}>{
-                item.key==='suppliers' ? '🏪 ' + item.label :
-                item.key==='customers' ? '🧑‍💼 ' + item.label :
-                item.key==='stats' ? '📈 ' + item.label :
-                item.key==='tradeStats' ? '📊 ' + item.label :
-                item.key==='changePwd' ? '🔑 ' + item.label :
-                item.label
-              }</button>
+              <button key={item.key} className={`btn ${tab===item.key?'primary':''}`} onClick={() => { go(item.key); setMenuOpen(false) }}>{item.label}</button>
             ))}
             <button className="btn" onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('role'); setAuthed(false) }}>Đăng xuất</button>
           </div>
