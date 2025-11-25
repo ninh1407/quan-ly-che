@@ -2,6 +2,7 @@
 .tabs{margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:50}
 .nav-buttons{display:flex;gap:10px;flex-wrap:wrap}
 .hamburger-btn{padding:10px 12px;border:1px solid var(--border);background:var(--accent);border-radius:10px}
+.hamburger-btn.corner{position:fixed;top:6px;left:6px;z-index:1000}
 .drawer{position:fixed;inset:0;display:none;background:rgba(0,0,0,.35);backdrop-filter:blur(2px);z-index:2000}
 .drawer.open{display:block}
 .drawer-panel{position:absolute;top:0;left:0;width:280px;height:100%;background:var(--surface);border-right:1px solid var(--border);box-shadow:0 8px 24px var(--shadow);padding:16px;display:flex;flex-direction:column;gap:10px;z-index:2001}
@@ -269,6 +270,5 @@ html{scroll-behavior:smooth}
 .cost-card h3,.cost-card h2{display:flex;align-items:center;gap:8px}
 .btn.primary{background:#A65A2B;color:#fff;border-color:#A65A2B}
 .btn.primary:hover{background:#8b4e26}
-[data-device="mobile"] .mobile-toolbar{display:grid;grid-template-columns:1fr auto;gap:8px;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:50}
-[data-device="mobile"] .mobile-toolbar select{height:44px;border:1px solid var(--border);border-radius:12px;padding:0 12px;background:var(--surface);color:var(--text)}
+[data-device="mobile"] .mobile-toolbar{display:none}
 [data-device="mobile"] .tabs{display:none}
