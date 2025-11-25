@@ -269,3 +269,5 @@ html{scroll-behavior:smooth}
 .cost-card h3,.cost-card h2{display:flex;align-items:center;gap:8px}
 .btn.primary{background:#A65A2B;color:#fff;border-color:#A65A2B}
 .btn.primary:hover{background:#8b4e26}
+[data-device="mobile"] .mobile-toolbar{display:grid;grid-template-columns:1fr auto;gap:8px;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:50}
+[data-device="mobile"] .mobile-toolbar select{height:44px;border:1px solid var(--border);border-radius:12px;padding:0 12px;background:var(--surface);color:var(--text)}
