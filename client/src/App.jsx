@@ -91,18 +91,18 @@ export default function App() {
                     { key:'purchases', label:'📥 Nhập chè' },
                     { key:'expenses', label:'🧾 Chi phí' },
                     { key:'debts', label:'💳 Công nợ' },
-                    { key:'suppliers', label:'Nhà CC' },
-                    { key:'customers', label:'Người mua' },
-                    { key:'stats', label:'Thống kê' },
-                    { key:'tradeStats', label:'Thống kê giao dịch' },
-                    { key:'changePwd', label:'Đổi mật khẩu' },
+                    { key:'suppliers', label:'🏪 Nhà CC' },
+                    { key:'customers', label:'🧑‍💼 Người mua' },
+                    { key:'stats', label:'📈 Thống kê' },
+                    { key:'tradeStats', label:'📊 Thống kê giao dịch' },
+                    { key:'changePwd', label:'🔑 Đổi mật khẩu' },
                     { key:'admin', label:'⚙️ Quản trị' }
                   ]
                 : [
                     { key:'sales', label:'🛒 Bán chè' },
                     { key:'purchases', label:'📥 Nhập chè' },
                     { key:'expenses', label:'🧾 Chi phí' },
-                    { key:'changePwd', label:'Đổi mật khẩu' }
+                    { key:'changePwd', label:'🔑 Đổi mật khẩu' }
                   ]
             ).map(item => (
               <button key={item.key} className={`btn ${tab===item.key?'primary':''}`} onClick={() => { go(item.key); setMenuOpen(false) }}>{
