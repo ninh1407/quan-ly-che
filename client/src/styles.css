@@ -88,8 +88,11 @@ body{background:var(--bg)}
 [data-device="mobile"] .filters{grid-template-columns:1fr}
 [data-device="mobile"] input,[data-device="mobile"] select{height:48px;font-size:16px}
 [data-device="mobile"] .btn{height:48px;padding:12px 16px;font-size:16px}
-[data-device="mobile"] .table{font-size:15px}
-[data-device="mobile"] .container{padding:0 14px}
+[data-device="mobile"] .table{font-size:15px;min-width:560px}
+[data-device="mobile"] .container{padding:0 16px}
+[data-device="mobile"] .card{border-radius:18px;padding:16px;overflow:visible}
+[data-device="mobile"] html,[data-device="mobile"] body{overflow-x:hidden}
+[data-device="mobile"] .hero{padding:20px;border-radius:18px}
 [data-device="pc"] .form{grid-template-columns:1fr}
 .root{}
 :root{
