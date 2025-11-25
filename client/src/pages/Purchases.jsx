@@ -37,7 +37,7 @@ export default function Purchases() {
   const receiptEndpoint = (type, id) => `${origin}/api/${type}/${id}/receipt?t=${encodeURIComponent(token)}`
   const STATUS_LABELS = { pending: 'Chờ', paid: 'Đã thanh toán' }
   const [form, setForm] = useState({
-    purchase_date: '', supplier_name: '', ticket_name: '', weigh_ticket_code: '', vehicle_plate: '', weight: '', water_percent: '', unit_price: '', payment_status: 'pending'
+    purchase_date: '', supplier_name: '', ticket_name: '', invoice_no: '', weigh_ticket_code: '', vehicle_plate: '', weight: '', water_percent: '', unit_price: '', payment_status: 'pending'
   });
   const currentUser = (localStorage.getItem('username')||'')
   const draftKey = `draft:purchases:${currentUser}`
@@ -150,24 +150,25 @@ export default function Purchases() {
         await api.post('/purchases', payload);
       }
       try { localStorage.removeItem(draftKey) } catch {}
-      setForm({ purchase_date: '', supplier_name: '', ticket_name: '', weigh_ticket_code: '', vehicle_plate: '', weight: '', water_percent: '', unit_price: '', payment_status: 'pending' });
+      setForm({ purchase_date: '', supplier_name: '', ticket_name: '', invoice_no: '', weigh_ticket_code: '', vehicle_plate: '', weight: '', water_percent: '', unit_price: '', payment_status: 'pending' });
       await load();
     } catch (e) { setError(e?.response?.data?.message || 'Thêm giao dịch nhập lỗi'); }
   };
 
   const editRow = (r) => {
     setEditingId(r.id);
-    setForm({
-      purchase_date: r.purchase_date || '',
-      supplier_name: r.supplier_name || '',
-      ticket_name: r.ticket_name || '',
-      weigh_ticket_code: r.weigh_ticket_code || '',
-      vehicle_plate: r.vehicle_plate || '',
-      weight: r.weight || '',
-      water_percent: r.water_percent ?? '',
-      unit_price: formatMoneyInput(r.unit_price || ''),
-      payment_status: r.payment_status || 'pending'
-    });
+      setForm({
+        purchase_date: r.purchase_date || '',
+        supplier_name: r.supplier_name || '',
+        ticket_name: r.ticket_name || '',
+        invoice_no: r.invoice_no || '',
+        weigh_ticket_code: r.weigh_ticket_code || '',
+        vehicle_plate: r.vehicle_plate || '',
+        weight: r.weight || '',
+        water_percent: r.water_percent ?? '',
+        unit_price: formatMoneyInput(r.unit_price || ''),
+        payment_status: r.payment_status || 'pending'
+      });
   };
 
   const deleteRow = async (id) => { setDeleteId(id); };
@@ -280,6 +281,8 @@ export default function Purchases() {
         <input type="date" value={form.purchase_date} onChange={(e) => change('purchase_date', e.target.value)} />
         <label>Tên Phiếu</label>
         <input value={form.ticket_name} onChange={(e) => change('ticket_name', e.target.value)} />
+        <label>Số HĐ</label>
+        <input value={form.invoice_no} onChange={(e) => change('invoice_no', e.target.value)} />
         <label>Mã phiếu cân</label>
         <input value={form.weigh_ticket_code} onChange={(e) => change('weigh_ticket_code', e.target.value)} />
         <label>Biển số xe cân</label>

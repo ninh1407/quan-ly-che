@@ -71,7 +71,7 @@ export default function Sales() {
   const [recentSales, setRecentSales] = useState([])
   const [recentPurchases, setRecentPurchases] = useState([])
   const [form, setForm] = useState({
-    sale_date: '', ticket_name: '', contract: '', created_by: currentUser, issued_by: '', customer_name: '', tea_type: '', price_per_kg: '', weight: '', payment_status: 'pending', export_type: 'domestic', country: ''
+    sale_date: '', ticket_name: '', invoice_no: '', contract: '', created_by: currentUser, issued_by: '', customer_name: '', tea_type: '', price_per_kg: '', weight: '', payment_status: 'pending', export_type: 'domestic', country: ''
   });
   const draftKey = `draft:sales:${currentUser}`
 
@@ -168,7 +168,7 @@ export default function Sales() {
         await api.post('/sales', payload);
       }
       try { localStorage.removeItem(draftKey) } catch {}
-      setForm({ sale_date: '', ticket_name: '', contract: '', created_by: currentUser, issued_by: '', customer_name: '', tea_type: '', price_per_kg: '', weight: '', payment_status: 'pending', export_type: 'domestic', country: '' });
+      setForm({ sale_date: '', ticket_name: '', invoice_no: '', contract: '', created_by: currentUser, issued_by: '', customer_name: '', tea_type: '', price_per_kg: '', weight: '', payment_status: 'pending', export_type: 'domestic', country: '' });
       await load();
     } catch (e) {
       const msg = e?.response?.data?.detail || e?.response?.data?.message || e?.message || 'Thêm đơn bán lỗi';
@@ -194,20 +194,21 @@ export default function Sales() {
 
   const editRow = (r) => {
     setEditingId(r.id);
-    setForm({
-      sale_date: r.sale_date || '',
-      ticket_name: r.ticket_name || '',
-      contract: r.contract || '',
-      created_by: r.created_by || '',
-      issued_by: r.issued_by || '',
-      customer_name: r.customer_name || '',
-      tea_type: r.tea_type || '',
-      price_per_kg: formatMoneyInput(r.price_per_kg || ''),
-      weight: r.weight || '',
-      payment_status: r.payment_status || 'pending',
-      export_type: r.export_type || 'domestic',
-      country: r.country || ''
-    });
+      setForm({
+        sale_date: r.sale_date || '',
+        ticket_name: r.ticket_name || '',
+        invoice_no: r.invoice_no || '',
+        contract: r.contract || '',
+        created_by: r.created_by || '',
+        issued_by: r.issued_by || '',
+        customer_name: r.customer_name || '',
+        tea_type: r.tea_type || '',
+        price_per_kg: formatMoneyInput(r.price_per_kg || ''),
+        weight: r.weight || '',
+        payment_status: r.payment_status || 'pending',
+        export_type: r.export_type || 'domestic',
+        country: r.country || ''
+      });
   };
 
   const deleteRow = async (id) => {
@@ -314,6 +315,8 @@ export default function Sales() {
         <input type="date" value={form.sale_date} onChange={(e) => change('sale_date', e.target.value)} />
         <label>Tên phiếu</label>
         <input value={form.ticket_name} onChange={(e) => change('ticket_name', e.target.value)} />
+        <label>Số HĐ</label>
+        <input value={form.invoice_no} onChange={(e) => change('invoice_no', e.target.value)} />
         <label>Hợp đồng</label>
         <input value={form.contract} onChange={(e) => change('contract', e.target.value)} />
         <label>Người tạo phiếu</label>

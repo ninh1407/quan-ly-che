@@ -642,7 +642,8 @@ function pad2(n) { return String(n).padStart(2, '0'); }
     if (q) and.push({ $or: [
       { customer_name: { $regex: q, $options: 'i' } },
       { tea_type: { $regex: q, $options: 'i' } },
-      { ticket_name: { $regex: q, $options: 'i' } }
+      { ticket_name: { $regex: q, $options: 'i' } },
+      { invoice_no: { $regex: q, $options: 'i' } }
     ]});
     if (!hasRole(req, 'admin')) {
       const uname = String(req.user?.username || '')
@@ -659,6 +660,7 @@ function pad2(n) { return String(n).padStart(2, '0'); }
         weight: Number(r.weight || 0),
         payment_status: r.payment_status || 'pending',
         ticket_name: r.ticket_name || null,
+        invoice_no: r.invoice_no || null,
         contract: r.contract || null,
         created_by: r.created_by || null,
         owner: r.owner || r.created_by || null,
@@ -680,11 +682,11 @@ function pad2(n) { return String(n).padStart(2, '0'); }
     where.push('payment_status = ?'); params.push(payment_status);
   }
   if (q) {
-    where.push('(customer_name LIKE ? OR tea_type LIKE ? OR ticket_name LIKE ?)');
-    params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+    where.push('(customer_name LIKE ? OR tea_type LIKE ? OR ticket_name LIKE ? OR invoice_no LIKE ?)');
+    params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
   }
   if (!hasRole(req, 'admin')) { const u = String(req.user?.username || ''); where.push('owner = ?'); params.push(u) }
-  const sql = `SELECT id, sale_date, customer_name, tea_type, price_per_kg, weight, payment_status, ticket_name, contract, created_by, owner, issued_by, export_type, country, receipt_path,
+  const sql = `SELECT id, sale_date, customer_name, tea_type, price_per_kg, weight, payment_status, ticket_name, invoice_no, contract, created_by, owner, issued_by, export_type, country, receipt_path,
     (price_per_kg * weight) AS total_amount FROM sales ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY sale_date ASC, id ASC`;
   db.all(sql, params, (err, rows) => {
     if (err) return res.status(500).json({ message: 'DB error', detail: err.message });
@@ -694,7 +696,7 @@ function pad2(n) { return String(n).padStart(2, '0'); }
 
 app.post('/sales', rateLimit(60_000, 30, 'sales_post'), requireAuth, (req, res) => {
   if (!(hasRole(req, 'admin') || hasRole(req, 'seller'))) return res.status(403).json({ message: 'Forbidden: seller or admin required' });
-  const { sale_date, customer_name, tea_type, price_per_kg, weight, payment_status = 'pending', ticket_name = null, contract = null, issued_by = null, export_type = null, country = null } = req.body;
+  const { sale_date, customer_name, tea_type, price_per_kg, weight, payment_status = 'pending', ticket_name = null, invoice_no = null, contract = null, issued_by = null, export_type = null, country = null } = req.body;
   const p = Number(price_per_kg);
   const w = Number(weight);
   if (!sale_date || p <= 0 || w <= 0) return res.status(400).json({ message: 'Missing/invalid sale_date/price_per_kg/weight', detail: 'price_per_kg and weight must be > 0' });
@@ -702,7 +704,7 @@ app.post('/sales', rateLimit(60_000, 30, 'sales_post'), requireAuth, (req, res) 
   const ownerUser = String(req.user?.username || '');
   if (MONGO_READY) {
     nextId('sales').then(id => {
-      const doc = { id, sale_date, customer_name: customer_name || '', tea_type: tea_type || '', price_per_kg: p, weight: w, payment_status, ticket_name: ticket_name || null, contract: contract || null, created_by: ownerUser || null, owner: ownerUser || null, issued_by: issued_by || null, export_type: export_type || null, country: country || null, total_amount: p * w };
+      const doc = { id, sale_date, customer_name: customer_name || '', tea_type: tea_type || '', price_per_kg: p, weight: w, payment_status, ticket_name: ticket_name || null, invoice_no: invoice_no || null, contract: contract || null, created_by: ownerUser || null, owner: ownerUser || null, issued_by: issued_by || null, export_type: export_type || null, country: country || null, total_amount: p * w };
       mongoDb.collection('sales').insertOne(doc).then(() => { auditLog('sales', id, 'create', req, { sale_date, customer_name, tea_type, price_per_kg: p, weight: w, payment_status, ticket_name, contract, created_by: ownerUser, issued_by, export_type, country }); res.json({ id }) }).catch(e => res.status(500).json({ message: 'DB error', detail: e.message }))
     });
     return;
@@ -715,8 +717,8 @@ app.post('/sales', rateLimit(60_000, 30, 'sales_post'), requireAuth, (req, res) 
       ? [sale_date, customer_name || '', tea_type || '', Number(price_per_kg), Number(weight), payment_status, Number(price_per_kg), Number(weight)]
       : [sale_date, customer_name || '', tea_type || '', Number(price_per_kg), Number(weight), payment_status];
     console.log('Insert sales includeTotal=', includeTotal, 'params=', params);
-    db.run(sql, params, function (err) {
-      if (err) {
+      db.run(sql, params, function (err) {
+        if (err) {
         const msg = String(err.message || '');
         if (includeTotal && /no such column|has no column named total_amount/i.test(msg)) {
           return runInsert(false);
@@ -727,7 +729,7 @@ app.post('/sales', rateLimit(60_000, 30, 'sales_post'), requireAuth, (req, res) 
         return res.status(500).json({ message: 'DB error', detail: err.message });
       }
       const id = this.lastID;
-      db.run(`UPDATE sales SET ticket_name = ?, contract = ?, created_by = ?, owner = ?, issued_by = ?, export_type = ?, country = ? WHERE id = ?`, [ticket_name || null, contract || null, ownerUser || null, ownerUser || null, issued_by || null, export_type || null, country || null, id], () => {});
+      db.run(`UPDATE sales SET ticket_name = ?, invoice_no = ?, contract = ?, created_by = ?, owner = ?, issued_by = ?, export_type = ?, country = ? WHERE id = ?`, [ticket_name || null, invoice_no || null, contract || null, ownerUser || null, ownerUser || null, issued_by || null, export_type || null, country || null, id], () => {});
       if (MONGO_READY) {
         const doc = { id, sale_date, customer_name: customer_name || '', tea_type: tea_type || '', price_per_kg: Number(price_per_kg), weight: Number(weight), payment_status, ticket_name: ticket_name || null, contract: contract || null, created_by: created_by || null, issued_by: issued_by || null, export_type: export_type || null, country: country || null, total_amount: Number(price_per_kg) * Number(weight) };
         mongoDb.collection('sales').insertOne(doc).catch(() => {});
@@ -741,7 +743,7 @@ app.post('/sales', rateLimit(60_000, 30, 'sales_post'), requireAuth, (req, res) 
 
 app.put('/sales/:id', rateLimit(60_000, 60, 'sales_put'), requireAuth, (req, res) => {
   const id = req.params.id;
-  const { sale_date, customer_name, tea_type, price_per_kg, weight, payment_status, ticket_name, contract, created_by, issued_by, export_type, country, receipt_data, receipt_name } = req.body;
+  const { sale_date, customer_name, tea_type, price_per_kg, weight, payment_status, ticket_name, invoice_no, contract, created_by, issued_by, export_type, country, receipt_data, receipt_name } = req.body;
   const isAdmin = hasRole(req, 'admin')
   const isFinance = hasRole(req, 'finance')
   const isSeller = hasRole(req, 'seller')
@@ -813,6 +815,7 @@ app.put('/sales/:id', rateLimit(60_000, 60, 'sales_put'), requireAuth, (req, res
   if (weight != null) { fields.push('weight = ?'); params.push(Number(weight)); }
   if (payment_status != null) { fields.push('payment_status = ?'); params.push(payment_status); }
   if (ticket_name != null) { fields.push('ticket_name = ?'); params.push(ticket_name); }
+  if (invoice_no != null) { fields.push('invoice_no = ?'); params.push(invoice_no); }
   if (contract != null) { fields.push('contract = ?'); params.push(contract); }
   if (created_by != null) { fields.push('created_by = ?'); params.push(created_by); }
   if (issued_by != null) { fields.push('issued_by = ?'); params.push(issued_by); }
@@ -948,6 +951,7 @@ app.get('/sales/:id/receipt', requireAuth, (req, res) => {
     if (q) and.push({ $or: [
       { supplier_name: { $regex: q, $options: 'i' } },
       { ticket_name: { $regex: q, $options: 'i' } },
+      { invoice_no: { $regex: q, $options: 'i' } },
       { vehicle_plate: { $regex: q, $options: 'i' } }
     ]});
     if (String(req.user?.role) !== 'admin') {
@@ -966,6 +970,7 @@ app.get('/sales/:id/receipt', requireAuth, (req, res) => {
         water_percent: r.water_percent == null ? null : Number(r.water_percent),
         net_weight: r.net_weight == null ? null : Number(r.net_weight),
         ticket_name: r.ticket_name || null,
+        invoice_no: r.invoice_no || null,
         weigh_ticket_code: r.weigh_ticket_code || null,
         vehicle_plate: r.vehicle_plate || null,
         owner: r.owner || r.created_by || null,
@@ -984,12 +989,12 @@ app.get('/sales/:id/receipt', requireAuth, (req, res) => {
     where.push('payment_status = ?'); params.push(payment_status);
   }
   if (q) {
-    where.push('(supplier_name LIKE ? OR ticket_name LIKE ? OR vehicle_plate LIKE ?)');
-    params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+    where.push('(supplier_name LIKE ? OR ticket_name LIKE ? OR invoice_no LIKE ? OR vehicle_plate LIKE ?)');
+    params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
   }
   if (!hasRole(req, 'admin')) { where.push('owner = ?'); params.push(String(req.user?.username || '')) }
   const totalExpr = PURCHASES_HAS_TOTAL_COST ? 'COALESCE(total_cost, (unit_price * COALESCE(net_weight, weight)))' : '(unit_price * COALESCE(net_weight, weight))';
-  const sql = `SELECT id, purchase_date, supplier_name, weight, unit_price, payment_status, water_percent, net_weight, ticket_name, weigh_ticket_code, vehicle_plate, owner, receipt_path,
+  const sql = `SELECT id, purchase_date, supplier_name, weight, unit_price, payment_status, water_percent, net_weight, ticket_name, invoice_no, weigh_ticket_code, vehicle_plate, owner, receipt_path,
     ${totalExpr} AS total_cost FROM purchases ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY purchase_date ASC, id ASC`;
   db.all(sql, params, (err, rows) => {
     if (err) return res.status(500).json({ message: 'DB error', detail: err.message });
@@ -998,7 +1003,7 @@ app.get('/sales/:id/receipt', requireAuth, (req, res) => {
 });
 
 app.post('/purchases', rateLimit(60_000, 30, 'purchases_post'), requireAuth, (req, res) => {
-  const { purchase_date, supplier_name, weight, unit_price, payment_status = 'pending', water_percent = null, net_weight = null, ticket_name = null, weigh_ticket_code = null, vehicle_plate = null } = req.body;
+  const { purchase_date, supplier_name, weight, unit_price, payment_status = 'pending', water_percent = null, net_weight = null, ticket_name = null, invoice_no = null, weigh_ticket_code = null, vehicle_plate = null } = req.body;
   const u = Number(unit_price);
   const w = Number(weight);
   if (!purchase_date || u <= 0 || w <= 0) return res.status(400).json({ message: 'Missing/invalid purchase_date/unit_price/weight', detail: 'unit_price and weight must be > 0' });
@@ -1012,7 +1017,7 @@ app.post('/purchases', rateLimit(60_000, 30, 'purchases_post'), requireAuth, (re
   const ownerUser = String(req.user?.username || '');
   if (MONGO_READY) {
     nextId('purchases').then(id => {
-      const doc = { id, purchase_date, supplier_name: supplier_name || '', weight: numericWeight, unit_price: numericUnit, payment_status, water_percent: numericWater, net_weight: calcNet, ticket_name: ticket_name || null, weigh_ticket_code: weigh_ticket_code || null, vehicle_plate: vehicle_plate || null, owner: ownerUser || null, total_cost: numericUnit * calcNet };
+      const doc = { id, purchase_date, supplier_name: supplier_name || '', weight: numericWeight, unit_price: numericUnit, payment_status, water_percent: numericWater, net_weight: calcNet, ticket_name: ticket_name || null, invoice_no: invoice_no || null, weigh_ticket_code: weigh_ticket_code || null, vehicle_plate: vehicle_plate || null, owner: ownerUser || null, total_cost: numericUnit * calcNet };
       mongoDb.collection('purchases').insertOne(doc).then(() => { auditLog('purchases', id, 'create', req, { purchase_date, supplier_name, weight: numericWeight, unit_price: numericUnit, payment_status, water_percent: numericWater, net_weight: calcNet, ticket_name, weigh_ticket_code, vehicle_plate }); res.json({ id }) }).catch(e => res.status(500).json({ message: 'DB error', detail: e.message }))
     });
     return;
@@ -1036,7 +1041,7 @@ app.post('/purchases', rateLimit(60_000, 30, 'purchases_post'), requireAuth, (re
         return res.status(500).json({ message: 'DB error', detail: err.message });
       }
       const id = this.lastID;
-  db.run(`UPDATE purchases SET net_weight = ?, water_percent = ?, ticket_name = ?, weigh_ticket_code = ?, vehicle_plate = ?, owner = ? WHERE id = ?`, [calcNet, numericWater, ticket_name || null, weigh_ticket_code || null, vehicle_plate || null, ownerUser || null, id], () => {});
+  db.run(`UPDATE purchases SET net_weight = ?, water_percent = ?, ticket_name = ?, invoice_no = ?, weigh_ticket_code = ?, vehicle_plate = ?, owner = ? WHERE id = ?`, [calcNet, numericWater, ticket_name || null, invoice_no || null, weigh_ticket_code || null, vehicle_plate || null, ownerUser || null, id], () => {});
   if (MONGO_READY) {
     const doc = { id, purchase_date, supplier_name: supplier_name || '', weight: numericWeight, unit_price: numericUnit, payment_status, water_percent: numericWater, net_weight: calcNet, ticket_name: ticket_name || null, weigh_ticket_code: weigh_ticket_code || null, vehicle_plate: vehicle_plate || null, total_cost: numericUnit * calcNet };
     mongoDb.collection('purchases').insertOne(doc).catch(() => {});
@@ -1050,7 +1055,7 @@ app.post('/purchases', rateLimit(60_000, 30, 'purchases_post'), requireAuth, (re
 
 app.put('/purchases/:id', rateLimit(60_000, 60, 'purchases_put'), requireAuth, (req, res) => {
   const id = req.params.id;
-  const { purchase_date, supplier_name, weight, unit_price, payment_status, water_percent, net_weight, ticket_name, weigh_ticket_code, vehicle_plate, receipt_data, receipt_name } = req.body;
+  const { purchase_date, supplier_name, weight, unit_price, payment_status, water_percent, net_weight, ticket_name, invoice_no, weigh_ticket_code, vehicle_plate, receipt_data, receipt_name } = req.body;
   const isAdmin = hasRole(req, 'admin')
   const isFinance = hasRole(req, 'finance')
   const isWarehouse = hasRole(req, 'warehouse')
@@ -1085,6 +1090,7 @@ app.put('/purchases/:id', rateLimit(60_000, 60, 'purchases_put'), requireAuth, (
     if (water_percent != null) upd.water_percent = Number(water_percent);
     if (net_weight != null) upd.net_weight = Number(net_weight);
     if (ticket_name != null) upd.ticket_name = ticket_name;
+    if (invoice_no != null) upd.invoice_no = invoice_no;
     if (weigh_ticket_code != null) upd.weigh_ticket_code = weigh_ticket_code;
     if (vehicle_plate != null) upd.vehicle_plate = vehicle_plate;
     const needTotal = unit_price != null || weight != null || net_weight != null || water_percent != null;
@@ -1129,6 +1135,7 @@ app.put('/purchases/:id', rateLimit(60_000, 60, 'purchases_put'), requireAuth, (
   if (water_percent != null) { fields.push('water_percent = ?'); params.push(Number(water_percent)); }
   if (net_weight != null) { fields.push('net_weight = ?'); params.push(Number(net_weight)); }
   if (ticket_name != null) { fields.push('ticket_name = ?'); params.push(ticket_name); }
+  if (invoice_no != null) { fields.push('invoice_no = ?'); params.push(invoice_no); }
   if (weigh_ticket_code != null) { fields.push('weigh_ticket_code = ?'); params.push(weigh_ticket_code); }
   if (vehicle_plate != null) { fields.push('vehicle_plate = ?'); params.push(vehicle_plate); }
   if (payment_status === 'paid' && !receipt_data) return res.status(400).json({ message: 'Receipt image required', detail: 'Ảnh giao dịch bắt buộc (<5MB) khi đánh dấu đã trả' });
@@ -1160,6 +1167,7 @@ app.put('/purchases/:id', rateLimit(60_000, 60, 'purchases_put'), requireAuth, (
       if (water_percent != null) upd.water_percent = Number(water_percent);
       if (net_weight != null) upd.net_weight = Number(net_weight);
       if (ticket_name != null) upd.ticket_name = ticket_name;
+      if (invoice_no != null) upd.invoice_no = invoice_no;
       if (weigh_ticket_code != null) upd.weigh_ticket_code = weigh_ticket_code;
       if (vehicle_plate != null) upd.vehicle_plate = vehicle_plate;
       const needTotal = unit_price != null || weight != null || net_weight != null || water_percent != null;
@@ -1191,6 +1199,7 @@ app.put('/purchases/:id', rateLimit(60_000, 60, 'purchases_put'), requireAuth, (
     if (water_percent != null) changes.water_percent = Number(water_percent);
     if (net_weight != null) changes.net_weight = Number(net_weight);
     if (ticket_name != null) changes.ticket_name = ticket_name;
+    if (invoice_no != null) changes.invoice_no = invoice_no;
     if (weigh_ticket_code != null) changes.weigh_ticket_code = weigh_ticket_code;
     if (vehicle_plate != null) changes.vehicle_plate = vehicle_plate;
     auditLog('purchases', id, 'update', req, changes);
@@ -1343,34 +1352,48 @@ app.get('/receipts', requireAuth, async (req, res) => {
     }
     if (!SQLITE_READY) return res.status(500).json({ message: 'DB error', detail: 'No storage backend ready' });
     const uname = String(req.user?.username || '');
-    await new Promise((resolve) => db.serialize(() => {
-      if (wantType==='all' || wantType==='sales') {
-        const where = ['receipt_path IS NOT NULL'];
-        const params = [];
-        if (mStr && yStr) { where.push("strftime('%m', sale_date) = ?"); params.push(mStr); where.push("strftime('%Y', sale_date) = ?"); params.push(yStr); }
-        if (onlyMine) { where.push('owner = ?'); params.push(uname); }
-        const sql = `SELECT id, sale_date AS d, owner FROM sales ${where.length?'WHERE '+where.join(' AND '):''} ORDER BY d DESC, id DESC LIMIT ${limit}`;
-        db.all(sql, params, (e, rows) => { if (!e && rows) rows.forEach(r => out.push({ type:'sales', id:r.id, date:r.d, owner:r.owner||null })); });
-      }
-      if (wantType==='all' || wantType==='purchases') {
-        const where = ['receipt_path IS NOT NULL'];
-        const params = [];
-        if (mStr && yStr) { where.push("strftime('%m', purchase_date) = ?"); params.push(mStr); where.push("strftime('%Y', purchase_date) = ?"); params.push(yStr); }
-        if (onlyMine) { where.push('owner = ?'); params.push(uname); }
-        const sql = `SELECT id, purchase_date AS d, owner FROM purchases ${where.length?'WHERE '+where.join(' AND '):''} ORDER BY d DESC, id DESC LIMIT ${limit}`;
-        db.all(sql, params, (e, rows) => { if (!e && rows) rows.forEach(r => out.push({ type:'purchases', id:r.id, date:r.d, owner:r.owner||null })); });
-      }
-      if (wantType==='all' || wantType==='expenses') {
-        const where = ['receipt_path IS NOT NULL'];
-        const params = [];
-        if (mStr && yStr) { where.push("strftime('%m', expense_date) = ?"); params.push(mStr); where.push("strftime('%Y', expense_date) = ?"); params.push(yStr); }
-        if (onlyMine) { where.push('owner = ?'); params.push(uname); }
-        const sql = `SELECT id, expense_date AS d, owner FROM expenses ${where.length?'WHERE '+where.join(' AND '):''} ORDER BY d DESC, id DESC LIMIT ${limit}`;
-        db.all(sql, params, (e, rows) => { if (!e && rows) rows.forEach(r => out.push({ type:'expenses', id:r.id, date:r.d, owner:r.owner||null })); });
-      }
-      resolve();
-    }))
-    res.json(out);
+    const clauses = [];
+    const params = [];
+    const addDate = (col) => {
+      if (mStr && yStr) { clauses.push(`strftime('%m', ${col}) = ?`); params.push(mStr); clauses.push(`strftime('%Y', ${col}) = ?`); params.push(yStr); }
+    };
+    const ownerClause = (tbl) => (onlyMine ? ` AND ${tbl}.owner = ?` : '');
+    const ownerParam = (onlyMine ? [uname] : []);
+    let sql = '';
+    if (wantType==='sales') {
+      clauses.length = 0; params.length = 0;
+      clauses.push('sales.receipt_path IS NOT NULL'); addDate('sale_date');
+      sql = `SELECT 'sales' AS type, id, sale_date AS d, owner FROM sales ${clauses.length?'WHERE '+clauses.join(' AND '):''}${ownerClause('sales')} ORDER BY d DESC, id DESC LIMIT ${limit}`;
+      params.push(...ownerParam);
+    } else if (wantType==='purchases') {
+      clauses.length = 0; params.length = 0;
+      clauses.push('purchases.receipt_path IS NOT NULL'); addDate('purchase_date');
+      sql = `SELECT 'purchases' AS type, id, purchase_date AS d, owner FROM purchases ${clauses.length?'WHERE '+clauses.join(' AND '):''}${ownerClause('purchases')} ORDER BY d DESC, id DESC LIMIT ${limit}`;
+      params.push(...ownerParam);
+    } else if (wantType==='expenses') {
+      clauses.length = 0; params.length = 0;
+      clauses.push('expenses.receipt_path IS NOT NULL'); addDate('expense_date');
+      sql = `SELECT 'expenses' AS type, id, expense_date AS d, owner FROM expenses ${clauses.length?'WHERE '+clauses.join(' AND '):''}${ownerClause('expenses')} ORDER BY d DESC, id DESC LIMIT ${limit}`;
+      params.push(...ownerParam);
+    } else {
+      const salesWhere = []; const purchasesWhere = []; const expensesWhere = [];
+      salesWhere.push('sales.receipt_path IS NOT NULL'); purchasesWhere.push('purchases.receipt_path IS NOT NULL'); expensesWhere.push('expenses.receipt_path IS NOT NULL');
+      if (mStr && yStr) { salesWhere.push("strftime('%m', sale_date) = ?"); salesWhere.push("strftime('%Y', sale_date) = ?"); purchasesWhere.push("strftime('%m', purchase_date) = ?"); purchasesWhere.push("strftime('%Y', purchase_date) = ?"); expensesWhere.push("strftime('%m', expense_date) = ?"); expensesWhere.push("strftime('%Y', expense_date) = ?"); params.push(mStr,yStr,mStr,yStr,mStr,yStr); }
+      if (onlyMine) { salesWhere.push('sales.owner = ?'); purchasesWhere.push('purchases.owner = ?'); expensesWhere.push('expenses.owner = ?'); params.push(uname, uname, uname); }
+      sql = `
+        SELECT 'sales' AS type, id, sale_date AS d, owner, invoice_no AS invoice_no FROM sales ${salesWhere.length?'WHERE '+salesWhere.join(' AND '):''}
+        UNION ALL
+        SELECT 'purchases' AS type, id, purchase_date AS d, owner, invoice_no AS invoice_no FROM purchases ${purchasesWhere.length?'WHERE '+purchasesWhere.join(' AND '):''}
+        UNION ALL
+        SELECT 'expenses' AS type, id, expense_date AS d, owner, NULL AS invoice_no FROM expenses ${expensesWhere.length?'WHERE '+expensesWhere.join(' AND '):''}
+        ORDER BY d DESC, id DESC LIMIT ${limit}
+      `;
+    }
+    db.all(sql, params, (err, rows) => {
+      if (err) return res.status(500).json({ message: 'DB error', detail: err.message });
+      const data = (rows||[]).map(r => ({ type: r.type, id: r.id, date: r.d, owner: r.owner||null, invoice_no: r.invoice_no || r.inv || null }));
+      res.json(data);
+    });
   } catch (e) {
     res.status(500).json({ message: 'DB error', detail: e.message })
   }

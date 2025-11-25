@@ -9,6 +9,7 @@ export default function Receipts() {
   const [year, setYear] = useState(now.getFullYear())
   const [type, setType] = useState('all')
   const [list, setList] = useState([])
+  const [q, setQ] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const origin = (typeof window !== 'undefined') ? window.location.origin : ''
@@ -21,12 +22,14 @@ export default function Receipts() {
     setLoading(true); setError('')
     try {
       const params = { month, year, type }
+      if (q) params.q = q
       const r = await api.get('/receipts', { params })
       setList(r.data||[])
     } catch (e) { setError(e?.response?.data?.message || 'Tải ảnh lỗi') }
     finally { setLoading(false) }
   }
   useEffect(() => { load() }, [month, year, type])
+  useEffect(() => { const t = setTimeout(() => load(), 250); return () => clearTimeout(t) }, [q])
 
   return (
     <div className="card">
@@ -43,18 +46,21 @@ export default function Receipts() {
           <option value="purchases">Nhập</option>
           <option value="expenses">Chi</option>
         </select>
+        <label>Tìm Số HĐ</label>
+        <input value={q} onChange={(e)=> setQ(e.target.value)} placeholder="Nhập Số HĐ" />
       </div>
       {error && <div className="error" style={{ marginTop:8 }}>{error}</div>}
       <div className="table-wrap" style={{ marginTop:12 }}>
         {loading ? 'Đang tải...' : (
           <table className="table">
-            <thead><tr><th>Ảnh</th><th>Loại</th><th>Ngày</th><th>Người tạo</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Ảnh</th><th>Loại</th><th>Ngày</th><th>Số HĐ</th><th>Người tạo</th><th>Actions</th></tr></thead>
             <tbody>
               {(list||[]).map((r,i) => (
                 <tr key={`${r.type}-${r.id}-${i}`}>
                   <td><img alt="hoadon" src={ep(r.type, r.id)} style={{ maxHeight:80, borderRadius:8 }} onError={(e)=> { e.currentTarget.style.display='none' }} /></td>
                   <td>{r.type}</td>
                   <td>{fmtDate(r.date)}</td>
+                  <td>{r.invoice_no||''}</td>
                   <td>{r.owner||''}</td>
                   <td><a className="btn" href={ep(r.type, r.id)} target="_blank" rel="noreferrer">Mở</a></td>
                 </tr>
@@ -66,4 +72,3 @@ export default function Receipts() {
     </div>
   )
 }
-
