@@ -91,7 +91,7 @@ export default function Sales() {
       let data = res.data || [];
       if (q) {
         const s = q.toLowerCase();
-        data = data.filter(r => [r.ticket_name, r.contract, r.customer_name, r.tea_type, r.created_by, r.issued_by].some(v => String(v||'').toLowerCase().includes(s)));
+        data = data.filter(r => [r.invoice_no, r.ticket_name, r.contract, r.customer_name, r.tea_type, r.created_by, r.issued_by].some(v => String(v||'').toLowerCase().includes(s)));
       }
       if (range.from || range.to) {
         data = data.filter(r => {

@@ -66,7 +66,7 @@ export default function Purchases() {
       let data = res.data || [];
       if (q) {
         const s = q.toLowerCase();
-        data = data.filter(r => [r.ticket_name, r.weigh_ticket_code, r.vehicle_plate, r.supplier_name].some(v => String(v||'').toLowerCase().includes(s)));
+        data = data.filter(r => [r.invoice_no, r.ticket_name, r.weigh_ticket_code, r.vehicle_plate, r.supplier_name].some(v => String(v||'').toLowerCase().includes(s)));
       }
       if (range.from || range.to) {
         data = data.filter(r => {

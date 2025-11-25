@@ -1325,7 +1325,7 @@ app.get('/receipts', requireAuth, async (req, res) => {
     if (MONGO_READY) {
       const uname = String(req.user?.username || '');
       const pushMany = (rows, t) => {
-        rows.forEach(r => { if (r.receipt_path) out.push({ type: t, id: r.id, date: r.sale_date||r.purchase_date||r.expense_date, owner: r.owner||r.created_by||null }) });
+        rows.forEach(r => { if (r.receipt_path) out.push({ type: t, id: r.id, date: r.sale_date||r.purchase_date||r.expense_date, owner: r.owner||r.created_by||null, invoice_no: r.invoice_no || null }) });
       };
       if (wantType==='all' || wantType==='sales') {
         const and = [{ receipt_path: { $exists: true, $ne: null } }];
