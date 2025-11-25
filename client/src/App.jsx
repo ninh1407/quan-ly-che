@@ -61,6 +61,7 @@ export default function App() {
 
   return (
       <div className="container">
+      <button className="menu-fab" aria-label="Mở Menu" onClick={() => setMenuOpen(true)}>☰</button>
       <h1 className="glass">Quản lý Chè</h1>
       <Breadcrumb tab={tab} />
         <div className="tabs">
