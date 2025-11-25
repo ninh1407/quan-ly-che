@@ -24,9 +24,27 @@ export default function Receipts() {
       const params = { month, year, type }
       if (q) params.q = q
       const r = await api.get('/receipts', { params })
-      setList(r.data||[])
-    } catch (e) { setError(e?.response?.data?.message || 'Tải ảnh lỗi') }
-    finally { setLoading(false) }
+      setList(Array.isArray(r.data) ? r.data : [])
+    } catch (e) {
+      try {
+        const base = { month, year }
+        const [rs, rp, re] = await Promise.all([
+          api.get('/sales', { params: base }),
+          api.get('/purchases', { params: base }),
+          api.get('/expenses', { params: base })
+        ])
+        let items = []
+        const add = (arr, t, dateKey) => { (arr||[]).forEach(r => { if (r.receipt_path) items.push({ type:t, id:r.id, date:r[dateKey], owner:r.owner||r.created_by||null, invoice_no:r.invoice_no||null }) }) }
+        if (type==='all' || type==='sales') add(rs.data||[], 'sales', 'sale_date')
+        if (type==='all' || type==='purchases') add(rp.data||[], 'purchases', 'purchase_date')
+        if (type==='all' || type==='expenses') add(re.data||[], 'expenses', 'expense_date')
+        if (q) { const s=q.toLowerCase(); items = items.filter(r => String(r.invoice_no||'').toLowerCase().includes(s)) }
+        items.sort((a,b)=> String(b.date||'').localeCompare(String(a.date||'')))
+        setList(items)
+      } catch (e2) {
+        setError(e?.response?.data?.message || e2?.response?.data?.message || 'Tải ảnh lỗi')
+      }
+    } finally { setLoading(false) }
   }
   useEffect(() => { load() }, [month, year, type])
   useEffect(() => { const t = setTimeout(() => load(), 250); return () => clearTimeout(t) }, [q])
