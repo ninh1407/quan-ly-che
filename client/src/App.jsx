@@ -23,7 +23,6 @@ export default function App() {
   const [tab, setTab] = useState('dashboard')
   const [authed, setAuthed] = useState(!!localStorage.getItem('token'))
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light')
-  const [device, setDevice] = useState(localStorage.getItem('device') || 'pc')
   const [menuOpen, setMenuOpen] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
@@ -43,7 +42,7 @@ export default function App() {
   const go = (k) => { if (allowedTabs.includes(k)) setTab(k); else toast('Không có quyền truy cập') }
   React.useEffect(() => { if (!allowedTabs.includes(tab)) setTab(allowedTabs[0]) }, [])
   React.useEffect(() => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('theme', theme) }, [theme])
-  React.useEffect(() => { document.documentElement.setAttribute('data-device', device); localStorage.setItem('device', device) }, [device])
+  React.useEffect(() => { document.documentElement.setAttribute('data-device', 'pc'); localStorage.setItem('device', 'pc') }, [])
   React.useEffect(() => {
     const h = (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setCmdOpen(true) } }
     window.addEventListener('keydown', h)
@@ -63,60 +62,9 @@ export default function App() {
       <div className="container">
       <h1 className="glass">Quản lý Chè</h1>
       <Breadcrumb tab={tab} />
-      {device === 'mobile' ? (
-        <div className="mobile-toolbar">
-          <select value={tab} onChange={(e) => go(e.target.value)}>
-            {allowedTabs.map(k => (
-              <option key={k} value={k}>
-                {k==='dashboard'?'📊 Tổng quan':
-                 k==='balanceSheet'?'📘 Bảng cân đối':
-                 k==='finishedStock'?'🏷️ Thành phẩm':
-                 k==='season'?'📅 Theo Đợt':
-                 k==='sales'?'🛒 Bán chè':
-                 k==='purchases'?'📥 Nhập chè':
-                 k==='expenses'?'🧾 Chi phí':
-                 k==='debts'?'💳 Công nợ':
-                 k==='suppliers'?'Nhà CC':
-                 k==='customers'?'Người mua':
-                 k==='stats'?'Thống kê':
-                 k==='tradeStats'?'Thống kê giao dịch':
-                 k==='changePwd'?'Đổi mật khẩu':
-                 k==='admin'?'⚙️ Quản trị': k}
-              </option>
-            ))}
-          </select>
-          <div style={{ display:'flex', gap:8 }}>
-            <button className="btn" onClick={() => setMenuOpen(true)}>☰ Menu</button>
-            <details className="dropdown">
-              <summary className="btn">Thiết bị: {device==='pc'?'🖥️ PC':'📱 Mobile'} ▾</summary>
-              <div className="dropdown-menu">
-                <button className="btn" onClick={() => setDevice('pc')}>🖥️ PC</button>
-                <button className="btn" onClick={() => setDevice('mobile')}>📱 Mobile</button>
-              </div>
-            </details>
-            <details className="dropdown">
-              <summary className="btn avatar"><span className="circle">{(localStorage.getItem('username')||'N')[0].toUpperCase()}</span> {(localStorage.getItem('username')||'Người dùng')} ▾</summary>
-              <div className="dropdown-menu">
-                <button className="btn" onClick={() => setAccountOpen(true)}>Tài khoản</button>
-                <button className="btn" onClick={() => setNotifOpen(true)}>Thông báo</button>
-                <button className="btn" onClick={() => setSettingsOpen(true)}>Cài đặt</button>
-                <button className="btn" onClick={() => setTab('changePwd')}>Đổi mật khẩu</button>
-                <button className="btn" onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('role'); setAuthed(false) }}>Đăng xuất</button>
-              </div>
-            </details>
-          </div>
-        </div>
-      ) : (
-        <div className="tabs">
+      <div className="tabs">
           <button className="hamburger-btn" onClick={() => setMenuOpen(true)}>☰ Menu</button>
           <button className="btn" onClick={() => setTheme(theme === 'light' ? 'dark' : (theme==='dark' ? 'tea' : (theme==='tea' ? 'wood' : 'light')))}>{theme === 'light' ? '🌙 Tối' : (theme==='dark' ? '🍵 Nâu – Xanh lá' : (theme==='tea' ? '🪵 Gỗ truyền thống' : '☀️ Sáng'))}</button>
-          <details className="dropdown">
-            <summary className="btn">Thiết bị: {device==='pc'?'🖥️ PC':'📱 Mobile'} ▾</summary>
-            <div className="dropdown-menu">
-              <button className="btn" onClick={() => setDevice('pc')}>🖥️ PC</button>
-              <button className="btn" onClick={() => setDevice('mobile')}>📱 Mobile</button>
-            </div>
-          </details>
           <details className="dropdown" style={{ marginLeft: 'auto' }}>
             <summary className="btn avatar"><span className="circle">{(localStorage.getItem('username')||'N')[0].toUpperCase()}</span> {(localStorage.getItem('username')||'Người dùng')} ▾</summary>
             <div className="dropdown-menu">
@@ -127,8 +75,7 @@ export default function App() {
               <button className="btn" onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('role'); setAuthed(false) }}>Đăng xuất</button>
             </div>
           </details>
-        </div>
-      )}
+      </div>
       {menuOpen && (
         <div className="drawer open" onClick={() => setMenuOpen(false)}>
           <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
@@ -158,7 +105,14 @@ export default function App() {
                     { key:'changePwd', label:'Đổi mật khẩu' }
                   ]
             ).map(item => (
-              <button key={item.key} className={`btn ${tab===item.key?'primary':''}`} onClick={() => { go(item.key); setMenuOpen(false) }}>{item.label}</button>
+              <button key={item.key} className={`btn ${tab===item.key?'primary':''}`} onClick={() => { go(item.key); setMenuOpen(false) }}>{
+                item.key==='suppliers' ? '🏪 ' + item.label :
+                item.key==='customers' ? '🧑‍💼 ' + item.label :
+                item.key==='stats' ? '📈 ' + item.label :
+                item.key==='tradeStats' ? '📊 ' + item.label :
+                item.key==='changePwd' ? '🔑 ' + item.label :
+                item.label
+              }</button>
             ))}
             <button className="btn" onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('role'); setAuthed(false) }}>Đăng xuất</button>
           </div>
