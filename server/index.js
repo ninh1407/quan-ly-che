@@ -1299,6 +1299,83 @@ app.put('/finished-stock/:id', requireAuth, (req, res) => {
   })
 })
 
+// Unified receipts list
+app.get('/receipts', requireAuth, async (req, res) => {
+  const { month, year, type } = req.query || {};
+  const mStr = month ? String(month).padStart(2,'0') : null;
+  const yStr = year ? String(year) : null;
+  const wantType = ['sales','purchases','expenses'].includes(String(type)) ? String(type) : 'all';
+  const limit = 500;
+  const onlyMine = !hasRole(req, 'admin');
+  try {
+    const out = [];
+    const matchDate = (dateStr) => {
+      if (!mStr || !yStr) return true;
+      return String(dateStr||'').startsWith(`${yStr}-${mStr}`);
+    };
+    if (MONGO_READY) {
+      const uname = String(req.user?.username || '');
+      const pushMany = (rows, t) => {
+        rows.forEach(r => { if (r.receipt_path) out.push({ type: t, id: r.id, date: r.sale_date||r.purchase_date||r.expense_date, owner: r.owner||r.created_by||null }) });
+      };
+      if (wantType==='all' || wantType==='sales') {
+        const and = [{ receipt_path: { $exists: true, $ne: null } }];
+        if (mStr && yStr) and.push({ sale_date: { $regex: `^${yStr}-${mStr}` } });
+        if (onlyMine) and.push({ $or: [{ owner: uname }, { created_by: uname }] });
+        const rows = await mongoDb.collection('sales').find({ $and: and }).sort({ sale_date: -1, id: -1 }).limit(limit).toArray();
+        pushMany(rows, 'sales');
+      }
+      if (wantType==='all' || wantType==='purchases') {
+        const and = [{ receipt_path: { $exists: true, $ne: null } }];
+        if (mStr && yStr) and.push({ purchase_date: { $regex: `^${yStr}-${mStr}` } });
+        if (onlyMine) and.push({ $or: [{ owner: uname }, { created_by: uname }] });
+        const rows = await mongoDb.collection('purchases').find({ $and: and }).sort({ purchase_date: -1, id: -1 }).limit(limit).toArray();
+        pushMany(rows, 'purchases');
+      }
+      if (wantType==='all' || wantType==='expenses') {
+        const and = [{ receipt_path: { $exists: true, $ne: null } }];
+        if (mStr && yStr) and.push({ expense_date: { $regex: `^${yStr}-${mStr}` } });
+        if (onlyMine) and.push({ $or: [{ owner: uname }] });
+        const rows = await mongoDb.collection('expenses').find({ $and: and }).sort({ expense_date: -1, id: -1 }).limit(limit).toArray();
+        pushMany(rows, 'expenses');
+      }
+      return res.json(out);
+    }
+    if (!SQLITE_READY) return res.status(500).json({ message: 'DB error', detail: 'No storage backend ready' });
+    const uname = String(req.user?.username || '');
+    await new Promise((resolve) => db.serialize(() => {
+      if (wantType==='all' || wantType==='sales') {
+        const where = ['receipt_path IS NOT NULL'];
+        const params = [];
+        if (mStr && yStr) { where.push("strftime('%m', sale_date) = ?"); params.push(mStr); where.push("strftime('%Y', sale_date) = ?"); params.push(yStr); }
+        if (onlyMine) { where.push('owner = ?'); params.push(uname); }
+        const sql = `SELECT id, sale_date AS d, owner FROM sales ${where.length?'WHERE '+where.join(' AND '):''} ORDER BY d DESC, id DESC LIMIT ${limit}`;
+        db.all(sql, params, (e, rows) => { if (!e && rows) rows.forEach(r => out.push({ type:'sales', id:r.id, date:r.d, owner:r.owner||null })); });
+      }
+      if (wantType==='all' || wantType==='purchases') {
+        const where = ['receipt_path IS NOT NULL'];
+        const params = [];
+        if (mStr && yStr) { where.push("strftime('%m', purchase_date) = ?"); params.push(mStr); where.push("strftime('%Y', purchase_date) = ?"); params.push(yStr); }
+        if (onlyMine) { where.push('owner = ?'); params.push(uname); }
+        const sql = `SELECT id, purchase_date AS d, owner FROM purchases ${where.length?'WHERE '+where.join(' AND '):''} ORDER BY d DESC, id DESC LIMIT ${limit}`;
+        db.all(sql, params, (e, rows) => { if (!e && rows) rows.forEach(r => out.push({ type:'purchases', id:r.id, date:r.d, owner:r.owner||null })); });
+      }
+      if (wantType==='all' || wantType==='expenses') {
+        const where = ['receipt_path IS NOT NULL'];
+        const params = [];
+        if (mStr && yStr) { where.push("strftime('%m', expense_date) = ?"); params.push(mStr); where.push("strftime('%Y', expense_date) = ?"); params.push(yStr); }
+        if (onlyMine) { where.push('owner = ?'); params.push(uname); }
+        const sql = `SELECT id, expense_date AS d, owner FROM expenses ${where.length?'WHERE '+where.join(' AND '):''} ORDER BY d DESC, id DESC LIMIT ${limit}`;
+        db.all(sql, params, (e, rows) => { if (!e && rows) rows.forEach(r => out.push({ type:'expenses', id:r.id, date:r.d, owner:r.owner||null })); });
+      }
+      resolve();
+    }))
+    res.json(out);
+  } catch (e) {
+    res.status(500).json({ message: 'DB error', detail: e.message })
+  }
+});
+
 app.delete('/finished-stock/:id', requireAuth, (req, res) => {
   if (!(hasRole(req, 'admin') || hasRole(req, 'warehouse'))) return res.status(403).json({ message: 'Forbidden: warehouse/admin required' })
   const id = Number(req.params.id);

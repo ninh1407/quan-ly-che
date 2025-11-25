@@ -18,6 +18,7 @@ import Login from './pages/Login.jsx'
 import Breadcrumb from './components/Breadcrumb.jsx'
 import Admin from './pages/Admin.jsx'
 import ChangePassword from './pages/ChangePassword.jsx'
+import Receipts from './pages/Receipts.jsx'
 
 export default function App() {
   const [tab, setTab] = useState('dashboard')
@@ -32,11 +33,11 @@ export default function App() {
   const rolesRaw = (() => { try { const r = JSON.parse(localStorage.getItem('roles')||'null'); if (Array.isArray(r)) return r; } catch {} const s = (localStorage.getItem('role')||'user'); return String(s).split(',').map(x=>x.trim()).filter(Boolean) })()
   const hasRole = (name) => rolesRaw.includes(name)
   const allowedTabs = hasRole('admin')
-    ? ['dashboard','balanceSheet','finishedStock','sales','purchases','expenses','debts','season','suppliers','customers','changePwd','admin','stats','tradeStats']
+    ? ['dashboard','balanceSheet','finishedStock','sales','purchases','expenses','debts','season','suppliers','customers','receipts','changePwd','admin','stats','tradeStats']
     : Array.from(new Set([
         ...(hasRole('seller') ? ['sales'] : []),
         ...(hasRole('warehouse') ? ['purchases','finishedStock'] : []),
-        ...(hasRole('finance') ? ['dashboard','balanceSheet','expenses','debts'] : []),
+        ...(hasRole('finance') ? ['dashboard','balanceSheet','expenses','debts','receipts'] : []),
         'customers','suppliers','changePwd'
       ]))
   const go = (k) => { if (allowedTabs.includes(k)) setTab(k); else toast('Không có quyền truy cập') }
@@ -93,6 +94,7 @@ export default function App() {
                     { key:'debts', label:'💳 Công nợ' },
                     { key:'suppliers', label:'🏪 Nhà CC' },
                     { key:'customers', label:'🧑‍💼 Người mua' },
+                    { key:'receipts', label:'🖼️ Ảnh hóa đơn' },
                     { key:'stats', label:'📈 Thống kê' },
                     { key:'tradeStats', label:'📊 Thống kê giao dịch' },
                     { key:'changePwd', label:'🔑 Đổi mật khẩu' },
@@ -112,21 +114,22 @@ export default function App() {
         </div>
       )}
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} onNavigate={(k) => go(k)} />
-      <ToastContainer />
-      {tab === 'dashboard' && <Dashboard />}
-      {tab === 'balanceSheet' && <BalanceSheet />}
-      {tab === 'finishedStock' && <FinishedStock />}
-      {tab === 'season' && <Season />}
-      {tab === 'sales' && <Sales />}
-      {tab === 'purchases' && <Purchases />}
-      {tab === 'expenses' && <Expenses />}
-      {tab === 'suppliers' && <Suppliers />}
-      {tab === 'debts' && <Debts />}
-      {tab === 'customers' && <Customers />}
-      {tab === 'changePwd' && <ChangePassword />}
-      {tab === 'stats' && <Stats />}
-      {tab === 'tradeStats' && <TradeStats />}
-      {tab === 'admin' && <Admin />}
+          <ToastContainer />
+          {tab === 'dashboard' && <Dashboard />}
+          {tab === 'balanceSheet' && <BalanceSheet />}
+          {tab === 'finishedStock' && <FinishedStock />}
+          {tab === 'season' && <Season />}
+          {tab === 'sales' && <Sales />}
+          {tab === 'purchases' && <Purchases />}
+          {tab === 'expenses' && <Expenses />}
+          {tab === 'suppliers' && <Suppliers />}
+          {tab === 'debts' && <Debts />}
+          {tab === 'customers' && <Customers />}
+          {tab === 'receipts' && <Receipts />}
+          {tab === 'changePwd' && <ChangePassword />}
+          {tab === 'stats' && <Stats />}
+          {tab === 'tradeStats' && <TradeStats />}
+          {tab === 'admin' && <Admin />}
       {accountOpen && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.35)', display:'flex', alignItems:'center', justifyContent:'center' }}>
           <div className="card" style={{ width: 380 }}>

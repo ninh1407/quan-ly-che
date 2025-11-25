@@ -1,7 +1,7 @@
 import React from 'react'
 
 const labels = {
-  dashboard: 'Tổng quan', balanceSheet: 'Bảng cân đối', finishedStock: 'Thành phẩm', sales: 'Thu', purchases: 'Nhập', expenses: 'Chi phí', suppliers: 'Nhà CC', customers: 'Người mua', debts: 'Công nợ', admin: 'Quản trị', season: 'Theo Đợt'
+  dashboard: 'Tổng quan', balanceSheet: 'Bảng cân đối', finishedStock: 'Thành phẩm', sales: 'Thu', purchases: 'Nhập', expenses: 'Chi phí', suppliers: 'Nhà CC', customers: 'Người mua', debts: 'Công nợ', admin: 'Quản trị', season: 'Theo Đợt', receipts: 'Ảnh hóa đơn'
 }
 
 export default function Breadcrumb({ tab }) {
@@ -16,4 +16,3 @@ export default function Breadcrumb({ tab }) {
     </div>
   )
 }
-
