@@ -491,6 +491,7 @@ if (SQLITE_READY) db.serialize(() => {
       ensureCol('price_per_kg', `ALTER TABLE sales ADD COLUMN price_per_kg REAL`);
       ensureCol('weight', `ALTER TABLE sales ADD COLUMN weight REAL`);
       ensureCol('ticket_name', `ALTER TABLE sales ADD COLUMN ticket_name TEXT`);
+      ensureCol('invoice_no', `ALTER TABLE sales ADD COLUMN invoice_no TEXT`);
       ensureCol('contract', `ALTER TABLE sales ADD COLUMN contract TEXT`);
       ensureCol('created_by', `ALTER TABLE sales ADD COLUMN created_by TEXT`);
       ensureCol('issued_by', `ALTER TABLE sales ADD COLUMN issued_by TEXT`);
@@ -561,6 +562,7 @@ if (SQLITE_READY) db.serialize(() => {
       ensureCol('water_percent', `ALTER TABLE purchases ADD COLUMN water_percent REAL`);
       ensureCol('net_weight', `ALTER TABLE purchases ADD COLUMN net_weight REAL`);
       ensureCol('ticket_name', `ALTER TABLE purchases ADD COLUMN ticket_name TEXT`);
+      ensureCol('invoice_no', `ALTER TABLE purchases ADD COLUMN invoice_no TEXT`);
       ensureCol('weigh_ticket_code', `ALTER TABLE purchases ADD COLUMN weigh_ticket_code TEXT`);
       ensureCol('vehicle_plate', `ALTER TABLE purchases ADD COLUMN vehicle_plate TEXT`);
       ensureCol('receipt_path', `ALTER TABLE purchases ADD COLUMN receipt_path TEXT`);
