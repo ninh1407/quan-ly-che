@@ -432,6 +432,13 @@ if (SQLITE_READY) db.serialize(() => {
         });
       }
     }
+    // Ensure session_id exists for single-session enforcement
+    db.all(`PRAGMA table_info(users)`, [], (e2, cols2) => {
+      if (!e2) {
+        const hasSession = cols2?.some(r => r.name === 'session_id');
+        if (!hasSession) db.run(`ALTER TABLE users ADD COLUMN session_id TEXT`, [], () => {});
+      }
+    });
     // Seed admin if not exists
     db.get(`SELECT id FROM users WHERE username = ?`, ['admin'], (e, u) => {
       if (!e && !u) {
@@ -2203,8 +2210,22 @@ function requireAuth(req, res, next) {
   if (!tok) return res.status(401).json({ message: 'Unauthorized' });
   try {
     const payload = jwt.verify(tok, JWT_SECRET);
-    req.user = payload; // { uid, username, roles: [] }
-    next();
+    const sid = String(payload?.sid||'');
+    const uname = String(payload?.username||'');
+    if (!sid || !uname) return res.status(401).json({ message: 'Unauthorized' });
+    const proceed = () => { req.user = payload; next(); };
+    if (MONGO_READY) {
+      return mongoDb.collection('users').findOne({ username: uname }).then(u => {
+        if (!u || String(u.session_id||'') !== sid) return res.status(401).json({ message: 'Unauthorized' });
+        proceed();
+      }).catch(() => res.status(401).json({ message: 'Unauthorized' }));
+    }
+    if (!SQLITE_READY) return res.status(401).json({ message: 'Unauthorized' });
+    db.get(`SELECT session_id FROM users WHERE username = ?`, [uname], (err, row) => {
+      if (err) return res.status(401).json({ message: 'Unauthorized' });
+      if (!row || String(row.session_id||'') !== sid) return res.status(401).json({ message: 'Unauthorized' });
+      proceed();
+    });
   } catch (e) {
     return res.status(401).json({ message: 'Unauthorized' });
   }
@@ -2304,7 +2325,9 @@ app.post('/auth/login', rateLimit(60_000, 5, 'login'), (req, res) => {
       if (!ok) return res.status(401).json({ message: 'Invalid credentials' });
       const roles = Array.isArray(row.role) ? row.role : String(row.role || 'user').split(',').map(s=>s.trim()).filter(Boolean);
       if (roles.includes('user_disabled') || roles.includes('disabled')) return res.status(403).json({ message: 'Account disabled' })
-      const token = jwt.sign({ uid: row.id, username: row.username, roles }, JWT_SECRET, { expiresIn: '7d' });
+      const sid = crypto.randomBytes(16).toString('hex');
+      mongoDb.collection('users').updateOne({ id: row.id }, { $set: { session_id: sid } }).catch(()=>{})
+      const token = jwt.sign({ uid: row.id, username: row.username, roles, sid }, JWT_SECRET, { expiresIn: '7d' });
       res.json({ token, roles });
       mongoDb.collection('security_logs').insertOne({ ts: new Date().toISOString(), username, success: 1, ip, ua, city: '', note: 'login' }).catch(()=>{})
     }).catch(err => res.status(500).json({ message: 'DB error', detail: err.message }));
@@ -2317,7 +2340,9 @@ app.post('/auth/login', rateLimit(60_000, 5, 'login'), (req, res) => {
     if (!ok) return res.status(401).json({ message: 'Invalid credentials' });
     const roles = String(row.role || 'user').split(',').map(s=>s.trim()).filter(Boolean);
     if (roles.includes('user_disabled') || roles.includes('disabled')) return res.status(403).json({ message: 'Account disabled' })
-    const token = jwt.sign({ uid: row.id, username: row.username, roles }, JWT_SECRET, { expiresIn: '7d' });
+    const sid = crypto.randomBytes(16).toString('hex');
+    db.run(`UPDATE users SET session_id = ? WHERE id = ?`, [sid, row.id], () => {});
+    const token = jwt.sign({ uid: row.id, username: row.username, roles, sid }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, roles });
     db.run(`INSERT INTO security_logs (ts, username, success, ip, ua, city, note) VALUES (?,?,?,?,?,?,?)`, [new Date().toISOString(), username, 1, ip, ua, '', 'login'], () => {})
   });

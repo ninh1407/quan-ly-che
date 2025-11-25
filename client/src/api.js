@@ -17,5 +17,16 @@ api.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+api.interceptors.response.use(
+  (resp) => resp,
+  (error) => {
+    const status = error?.response?.status;
+    if (status === 401) {
+      try { localStorage.removeItem('token'); localStorage.removeItem('role'); localStorage.removeItem('roles'); } catch {}
+      if (typeof window !== 'undefined') window.location.reload();
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default api;

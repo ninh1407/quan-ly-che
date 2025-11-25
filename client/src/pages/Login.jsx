@@ -6,6 +6,12 @@ export default function Login({ onSuccess, onLogout }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
+  const [device, setDevice] = useState(() => {
+    const saved = localStorage.getItem('device')
+    if (saved === 'mobile' || saved === 'pc') return saved
+    const ua = (typeof navigator !== 'undefined') ? navigator.userAgent.toLowerCase() : ''
+    return /mobile|android|iphone|ipad/.test(ua) ? 'mobile' : 'pc'
+  })
 
   useEffect(() => {
     if (error) {
@@ -20,6 +26,11 @@ export default function Login({ onSuccess, onLogout }) {
       return () => clearTimeout(t)
     }
   }, [info])
+
+  useEffect(() => {
+    try { localStorage.setItem('device', device) } catch {}
+    if (typeof document !== 'undefined') document.documentElement.setAttribute('data-device', device)
+  }, [device])
 
   const onLogin = async (e) => {
     e.preventDefault(); setError(''); setInfo('')
@@ -56,6 +67,13 @@ export default function Login({ onSuccess, onLogout }) {
       <div className="card login-card glass shadow-4">
         <div className="login-title">Đăng nhập</div>
         <form onSubmit={onLogin} className="login-form">
+          <div className="field">
+            <label>Thiết bị</label>
+            <div style={{ display:'flex', gap:8 }}>
+              <button type="button" className={`btn ${device==='pc'?'primary':''}`} onClick={() => setDevice('pc')}>Máy tính</button>
+              <button type="button" className={`btn ${device==='mobile'?'primary':''}`} onClick={() => setDevice('mobile')}>Điện thoại</button>
+            </div>
+          </div>
           <div className="field">
             <label>Tài khoản</label>
             <div className="input-icon"><span className="icon">👤</span><input placeholder="Tên đăng nhập" value={username} onChange={(e) => setUsername(e.target.value)} /></div>

@@ -83,6 +83,14 @@ body{background:var(--bg)}
   .form .btn.primary{width:100%}
   .section-bar{flex-wrap:wrap}
 }
+.device-override{}
+[data-device="mobile"] .form{grid-template-columns:1fr}
+[data-device="mobile"] .filters{grid-template-columns:1fr}
+[data-device="mobile"] input,[data-device="mobile"] select{height:48px;font-size:16px}
+[data-device="mobile"] .btn{height:48px;padding:12px 16px;font-size:16px}
+[data-device="mobile"] .table{font-size:15px}
+[data-device="mobile"] .container{padding:0 14px}
+[data-device="pc"] .form{grid-template-columns:1fr}
 .root{}
 :root{
   --bg:#ffffff;
