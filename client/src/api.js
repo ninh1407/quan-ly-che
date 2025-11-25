@@ -17,13 +17,19 @@ api.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+let __logoutOnce = false;
 api.interceptors.response.use(
   (resp) => resp,
   (error) => {
     const status = error?.response?.status;
-    if (status === 401) {
-      try { localStorage.removeItem('token'); localStorage.removeItem('role'); localStorage.removeItem('roles'); } catch {}
-      if (typeof window !== 'undefined') window.location.reload();
+    const hadToken = !!localStorage.getItem('token');
+    if (status === 401 && hadToken && !__logoutOnce) {
+      __logoutOnce = true;
+      try { localStorage.removeItem('token'); localStorage.removeItem('role'); localStorage.removeItem('roles'); localStorage.removeItem('username'); } catch {}
+      if (typeof window !== 'undefined') {
+        const url = window.location.origin + window.location.pathname;
+        window.location.replace(url);
+      }
     }
     return Promise.reject(error);
   }
