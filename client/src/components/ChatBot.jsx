@@ -7,6 +7,7 @@ export default function ChatBot() {
   const [msgs, setMsgs] = useState(() => {
     try { return JSON.parse(localStorage.getItem('chatbot_msgs')||'[]') } catch { return [] }
   })
+  const [loading, setLoading] = useState(false)
   const listRef = useRef(null)
   useEffect(() => { try { localStorage.setItem('chatbot_msgs', JSON.stringify(msgs)) } catch {} }, [msgs])
   useEffect(() => { if (open && listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight }, [open, msgs])
@@ -28,6 +29,18 @@ export default function ChatBot() {
         localStorage.setItem('prefill_purchases', JSON.stringify(a.payload||{}))
         window.dispatchEvent(new CustomEvent('chatbot:navigate', { detail: 'purchases' }))
         setOpen(false)
+      } else if (a.type === 'prefill_expenses') {
+        localStorage.setItem('prefill_expenses', JSON.stringify(a.payload||{}))
+        window.dispatchEvent(new CustomEvent('chatbot:navigate', { detail: 'expenses' }))
+        setOpen(false)
+      } else if (a.type === 'post_api') {
+        try {
+          const method = (a.method||'post').toLowerCase()
+          const r = await api.request({ method, url: a.path, data: a.payload||{} })
+          setMsgs(m => [...m, { role:'bot', text: 'Đã thực hiện xong', actions: [] }])
+        } catch (e) {
+          setMsgs(m => [...m, { role:'bot', text: 'Thực hiện lỗi', actions: [] }])
+        }
       }
     } catch {}
   }
@@ -36,12 +49,13 @@ export default function ChatBot() {
     const text = input.trim(); if (!text) return
     setMsgs(m => [...m, { role:'user', text }]); setInput('')
     try {
+      setLoading(true)
       const r = await api.post('/bot', { message: text })
       const data = r.data || {}
       setMsgs(m => [...m, { role:'bot', text: data.reply || 'Không có phản hồi', actions: data.actions || [] }])
     } catch (e) {
       setMsgs(m => [...m, { role:'bot', text: 'Bot lỗi, thử lại sau' }])
-    }
+    } finally { setLoading(false) }
   }
 
   return (
@@ -63,6 +77,12 @@ export default function ChatBot() {
                 )}
               </div>
             ))}
+            {loading && <div className="msg bot">Đang gõ...</div>}
+          </div>
+          <div style={{ padding:'6px 10px', display:'flex', gap:6 }}>
+            <button className="btn" onClick={() => { setInput('Báo cáo tháng '+(new Date().getMonth()+1)); send() }}>Báo cáo</button>
+            <button className="btn" onClick={() => { setInput('Nhắc việc'); send() }}>Nhắc việc</button>
+            <button className="btn" onClick={() => { setInput('Tìm HĐ 00123'); send() }}>Tìm HĐ</button>
           </div>
           <div className="chatbot-input">
             <input placeholder="Nhập câu hỏi..." value={input} onChange={(e)=> setInput(e.target.value)} onKeyDown={(e)=> { if (e.key==='Enter') send() }} />

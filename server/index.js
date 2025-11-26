@@ -632,6 +632,208 @@ if (SQLITE_READY) db.serialize(() => {
 
 function pad2(n) { return String(n).padStart(2, '0'); }
 
+function detectMonthYear(msg){
+  const now = new Date(); let m = now.getMonth()+1; let y = now.getFullYear();
+  const mm = String(msg||'').match(/tháng\s*(\d{1,2})/i); if (mm) m = Number(mm[1]);
+  const yy = String(msg||'').match(/năm\s*(\d{4})/i); if (yy) y = Number(yy[1]);
+  const m2 = String(msg||'').match(/(\d{4})[-/](\d{1,2})/); if (m2){ y = Number(m2[1]); m = Number(m2[2]); }
+  return { m, y }
+}
+async function kpiReply(msg){
+  const { m, y } = detectMonthYear(msg)
+  if (!SQLITE_READY) return { reply: 'DB chưa sẵn sàng', actions: [] }
+  const mm = pad2(m); const yy = String(y)
+  const p1 = new Promise((resolve)=> db.get(`SELECT SUM(price_per_kg * weight) AS s FROM sales WHERE strftime('%m', sale_date) = ? AND strftime('%Y', sale_date) = ?`, [mm, yy], (e,row)=> resolve(Number(row?.s||0))))
+  const p2 = new Promise((resolve)=> db.get(`SELECT SUM(unit_price * COALESCE(net_weight, weight)) AS s FROM purchases WHERE strftime('%m', purchase_date) = ? AND strftime('%Y', purchase_date) = ?`, [mm, yy], (e,row)=> resolve(Number(row?.s||0))))
+  const p3 = new Promise((resolve)=> db.get(`SELECT SUM(amount) AS s FROM expenses WHERE strftime('%m', expense_date) = ? AND strftime('%Y', expense_date) = ?`, [mm, yy], (e,row)=> resolve(Number(row?.s||0))))
+  const pRecv = new Promise((resolve)=> db.get(`SELECT SUM(price_per_kg * weight) AS s FROM sales WHERE payment_status != 'paid'`, [], (e,row)=> resolve(Number(row?.s||0))))
+  const pPay = new Promise((resolve)=> db.get(`SELECT SUM(unit_price * COALESCE(net_weight, weight)) AS s FROM purchases WHERE payment_status != 'paid'`, [], (e,row)=> resolve(Number(row?.s||0))))
+  const [sumSales, sumPurch, sumExp, recv, pay] = await Promise.all([p1,p2,p3,pRecv,pPay])
+  const profit = sumSales - sumPurch - sumExp
+  const reply = `Tháng ${m}/${y} — Thu: ${sumSales.toLocaleString()} • Chi nhập: ${sumPurch.toLocaleString()} • Chi phí: ${sumExp.toLocaleString()} • Lãi/Lỗ: ${profit.toLocaleString()} • Phải thu: ${recv.toLocaleString()} • Phải trả: ${pay.toLocaleString()}`
+  return { reply, actions: [{ type:'navigate', tab:'balanceSheet', label:'Mở Bảng cân đối' }] }
+}
+async function findReceipt(msg){
+  if (!SQLITE_READY) return { reply: 'DB chưa sẵn sàng', actions: [] }
+  const q = (String(msg||'').match(/h[đd]\s*([\w-]+)/i)?.[1]) || (String(msg||'').match(/(\d{4,})/)?.[1]) || ''
+  const whereLike = `%${q}%`
+  return new Promise((resolve)=> {
+    const out = []
+    db.all(`SELECT id, invoice_no, ticket_name, sale_date AS d FROM sales WHERE (invoice_no LIKE ? OR ticket_name LIKE ?) AND receipt_path IS NOT NULL ORDER BY d DESC LIMIT 5`, [whereLike, whereLike], (e,rows)=>{
+      (rows||[]).forEach(r=> out.push({ type:'sales', id:r.id, invoice_no:r.invoice_no||r.ticket_name||'' }))
+      db.all(`SELECT id, invoice_no, ticket_name, weigh_ticket_code, purchase_date AS d FROM purchases WHERE (invoice_no LIKE ? OR ticket_name LIKE ? OR weigh_ticket_code LIKE ?) AND receipt_path IS NOT NULL ORDER BY d DESC LIMIT 5`, [whereLike, whereLike, whereLike], (e2,rows2)=>{
+        (rows2||[]).forEach(r=> out.push({ type:'purchases', id:r.id, invoice_no:r.invoice_no||r.ticket_name||r.weigh_ticket_code||'' }))
+        if (!out.length) return resolve({ reply: 'Không tìm thấy ảnh hóa đơn phù hợp', actions: [] })
+        const actions = out.map(x=> ({ type:'open_url', path:`/api/${x.type}/${x.id}/receipt`, label:`Mở ${x.type} • ${x.invoice_no||('#'+x.id)}` }))
+        resolve({ reply: `Tìm thấy ${out.length} ảnh theo "${q}"`, actions })
+      })
+    })
+  })
+}
+function parseNumber(s){ const m = (String(s).match(/\d+[\.,]?\d*/) || ['0'])[0].replace(',','.'); return Number(m) }
+async function parseCreate(msg){
+  const isSale = /\b(bán|đơn bán)\b/i.test(msg)
+  const isPurch = /\b(nhập|đơn nhập)\b/i.test(msg)
+  const weight = parseNumber((String(msg).match(/(\d+[\.,]?\d*)\s*kg/i)||[])[1])
+  const price = parseNumber((String(msg).match(/giá\s*(\d+[\.,]?\d*)/i)||[])[1])
+  const dateM = String(msg).match(/(\d{1,2})[\/-](\d{1,2})/)
+  const now = new Date(); const y = now.getFullYear(); const dstr = dateM ? `${y}-${pad2(Number(dateM[2]))}-${pad2(Number(dateM[1]))}` : `${y}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())}`
+  const name = (String(msg).match(/cho\s+([^\d]+?)(?:\s+ngày|$)/i)||[])[1]?.trim() || ''
+  if (isSale) {
+    const payload = { sale_date: dstr, customer_name: name, tea_type:'', price_per_kg: price, weight, payment_status:'pending' }
+    return { reply:`Tạo đơn bán? Ngày ${dstr}, KH: ${name||'-'}, ${weight}kg x ${price}`, actions:[{ type:'prefill_sales', payload, label:'Điền form đơn bán' }, { type:'navigate', tab:'sales', label:'Mở Bán chè' }] }
+  }
+  if (isPurch) {
+    const payload = { purchase_date: dstr, supplier_name: name, ticket_name:'', weight, unit_price: price, payment_status:'pending' }
+    return { reply:`Tạo đơn nhập? Ngày ${dstr}, NCC: ${name||'-'}, ${weight}kg x ${price}`, actions:[{ type:'prefill_purchases', payload, label:'Điền form đơn nhập' }, { type:'navigate', tab:'purchases', label:'Mở Nhập chè' }] }
+  }
+  return { reply:'Bạn muốn tạo Đơn bán hay Đơn nhập? Ví dụ: "Thêm đơn bán 20kg giá 100k cho A ngày 25/11"', actions: [] }
+}
+async function parseCreateExpense(msg){
+  const isExpense = /\b(chi phí|thêm chi|tạo chi)\b/i.test(msg)
+  if (!isExpense) return null
+  const amount = parseNumber((String(msg).match(/(\d+[\.,]?\d*)\s*(đ|vnd|vnđ)/i)||[])[1])
+  const dateM = String(msg).match(/(\d{1,2})[\/-](\d{1,2})/)
+  const now = new Date(); const y = now.getFullYear(); const dstr = dateM ? `${y}-${pad2(Number(dateM[2]))}-${pad2(Number(dateM[1]))}` : `${y}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())}`
+  const desc = (String(msg).match(/cho\s+(.+?)(?:\s+ngày|$)/i)||[])[1]?.trim() || (String(msg).match(/chi phí\s+(.+?)\s+(\d+)/i)||[])[1] || ''
+  const payload = { expense_date: dstr, description: desc, amount: amount || '', category: 'Biến phí' }
+  return { reply:`Tạo chi phí? Ngày ${dstr}, Mô tả: ${desc||'-'}, Số tiền: ${amount||'-'}`, actions:[{ type:'prefill_expenses', payload, label:'Điền form Chi phí' }, { type:'navigate', tab:'expenses', label:'Mở Chi phí' }] }
+}
+async function topReply(msg){
+  const { m, y } = detectMonthYear(msg)
+  if (!SQLITE_READY) return { reply: 'DB chưa sẵn sàng', actions: [] }
+  const mm = pad2(m); const yy = String(y)
+  const wantSupplier = /(ncc|nhà cung cấp|supplier)/i.test(String(msg))
+  if (wantSupplier) {
+    return new Promise((resolve)=> db.all(`SELECT supplier_name AS name, SUM(unit_price * COALESCE(net_weight, weight)) AS s FROM purchases WHERE strftime('%m', purchase_date)=? AND strftime('%Y', purchase_date)=? GROUP BY supplier_name ORDER BY s DESC LIMIT 5`, [mm, yy], (e, rows)=>{
+      const list = (rows||[]).map(r=> `${r.name||'-'}: ${Number(r.s||0).toLocaleString()}`)
+      resolve({ reply: `Top NCC tháng ${m}/${y}: ${list.join(' • ')||'Không có dữ liệu'}`, actions:[{ type:'navigate', tab:'purchases', label:'Mở Nhập chè' }] })
+    }))
+  }
+  return new Promise((resolve)=> db.all(`SELECT customer_name AS name, SUM(price_per_kg * weight) AS s FROM sales WHERE strftime('%m', sale_date)=? AND strftime('%Y', sale_date)=? GROUP BY customer_name ORDER BY s DESC LIMIT 5`, [mm, yy], (e, rows)=>{
+    const list = (rows||[]).map(r=> `${r.name||'-'}: ${Number(r.s||0).toLocaleString()}`)
+    resolve({ reply: `Top khách hàng tháng ${m}/${y}: ${list.join(' • ')||'Không có dữ liệu'}`, actions:[{ type:'navigate', tab:'sales', label:'Mở Bán chè' }] })
+  }))
+}
+async function topYearReply(msg){
+  const yMatch = String(msg||'').match(/năm\s*(\d{4})/i); const y = yMatch ? Number(yMatch[1]) : (new Date()).getFullYear()
+  if (!SQLITE_READY) return { reply: 'DB chưa sẵn sàng', actions: [] }
+  const wantSupplier = /(ncc|nhà cung cấp|supplier)/i.test(String(msg))
+  if (wantSupplier) {
+    return new Promise((resolve)=> db.all(`SELECT supplier_name AS name, SUM(unit_price * COALESCE(net_weight, weight)) AS s FROM purchases WHERE strftime('%Y', purchase_date)=? GROUP BY supplier_name ORDER BY s DESC LIMIT 5`, [String(y)], (e, rows)=>{
+      const list = (rows||[]).map(r=> `${r.name||'-'}: ${Number(r.s||0).toLocaleString()}`)
+      resolve({ reply: `Top NCC năm ${y}: ${list.join(' • ')||'Không có dữ liệu'}`, actions:[{ type:'navigate', tab:'purchases', label:'Mở Nhập chè' }] })
+    }))
+  }
+  return new Promise((resolve)=> db.all(`SELECT customer_name AS name, SUM(price_per_kg * weight) AS s FROM sales WHERE strftime('%Y', sale_date)=? GROUP BY customer_name ORDER BY s DESC LIMIT 5`, [String(y)], (e, rows)=>{
+    const list = (rows||[]).map(r=> `${r.name||'-'}: ${Number(r.s||0).toLocaleString()}`)
+    resolve({ reply: `Top khách hàng năm ${y}: ${list.join(' • ')||'Không có dữ liệu'}`, actions:[{ type:'navigate', tab:'sales', label:'Mở Bán chè' }] })
+  }))
+}
+async function expenseBreakdown(msg){
+  const { m, y } = detectMonthYear(msg)
+  if (!SQLITE_READY) return { reply: 'DB chưa sẵn sàng', actions: [] }
+  const mm = pad2(m); const yy = String(y)
+  return new Promise((resolve)=> db.all(`SELECT category, SUM(amount) AS s FROM expenses WHERE strftime('%m', expense_date)=? AND strftime('%Y', expense_date)=? GROUP BY category ORDER BY s DESC`, [mm, yy], (e, rows)=>{
+    const total = (rows||[]).reduce((acc, r)=> acc + Number(r.s||0), 0)
+    const fixed = (rows||[]).filter(r=> /định/i.test(String(r.category||''))).reduce((acc,r)=> acc + Number(r.s||0), 0)
+    const variable = (rows||[]).filter(r=> /biến|khác|thuế|trả trước/i.test(String(r.category||''))).reduce((acc,r)=> acc + Number(r.s||0), 0)
+    const list = (rows||[]).slice(0,5).map(r=> `${r.category||'-'}: ${Number(r.s||0).toLocaleString()}`)
+    resolve({ reply: `Chi phí tháng ${m}/${y}: Tổng ${total.toLocaleString()} • Định phí ${fixed.toLocaleString()} • Biến phí ${variable.toLocaleString()} • Top: ${list.join(' • ')||'Không có'}`, actions:[{ type:'navigate', tab:'expenses', label:'Mở Chi phí' }] })
+  }))
+}
+async function debtsDetail(msg){
+  if (!SQLITE_READY) return { reply: 'DB chưa sẵn sàng', actions: [] }
+  const now = new Date()
+  const ageSales = await new Promise((resolve)=> db.all(`SELECT sale_date AS d, price_per_kg * weight AS v FROM sales WHERE payment_status != 'paid'`, [], (e, rows)=> resolve(rows||[])))
+  const agePurch = await new Promise((resolve)=> db.all(`SELECT purchase_date AS d, unit_price * COALESCE(net_weight, weight) AS v FROM purchases WHERE payment_status != 'paid'`, [], (e, rows)=> resolve(rows||[])))
+  function bucket(arr){
+    const b = { le7:0, le30:0, gt30:0 }
+    arr.forEach(r=> { const d = new Date(r.d||Date.now()); const diff = Math.floor((now - d)/86400000); const v = Number(r.v||0); if (diff<=7) b.le7+=v; else if (diff<=30) b.le30+=v; else b.gt30+=v })
+    return b
+  }
+  const recv = bucket(ageSales), pay = bucket(agePurch)
+  const reply = `Phải thu: ≤7 ngày ${recv.le7.toLocaleString()} • ≤30 ngày ${recv.le30.toLocaleString()} • >30 ngày ${recv.gt30.toLocaleString()} | Phải trả: ≤7 ngày ${pay.le7.toLocaleString()} • ≤30 ngày ${pay.le30.toLocaleString()} • >30 ngày ${pay.gt30.toLocaleString()}`
+  return { reply, actions:[{ type:'navigate', tab:'balanceSheet', label:'Mở Bảng cân đối' }] }
+}
+async function simpleBotReplyFull(text){
+  const msg = String(text||'').trim()
+  if (!msg) return { reply:'Bạn cần hỏi gì? Ví dụ: "Hướng dẫn nhập đơn"', actions:[] }
+  const low = msg.toLowerCase()
+  if (/(help|trợ giúp|hướng dẫn)/.test(low)) return { reply:'Các mục chính: Tổng quan, Bán, Nhập, Chi phí, Công nợ, Ảnh hóa đơn. Bạn muốn làm gì?', actions:[] }
+  if (/(doanh thu|báo cáo|kpi|lãi|lỗ|phải thu|phải trả|thống kê)/.test(low)) return kpiReply(low)
+  if (/(top|xếp hạng).*(khách hàng|ncc|nhà cung cấp)/.test(low)) return topReply(low)
+  if (/(top|xếp hạng).*(năm)/.test(low)) return topYearReply(low)
+  if (/(chi phí|breakdown|theo loại)/.test(low)) return expenseBreakdown(low)
+  if (/(công nợ|chi tiết công nợ|aging)/.test(low)) return debtsDetail(low)
+  if (/(hđ|hóa đơn|receipt|bill|số hđ|tìm ảnh)/.test(low)) return findReceipt(low)
+  if (/(thêm|tạo).*(đơn bán|đơn nhập|bán|nhập)/.test(low)) return parseCreate(low)
+  if (/(thêm|tạo).*(chi phí)/.test(low)) { const r = await parseCreateExpense(low); if (r) return r }
+  if (/(bán|đơn bán)/.test(low)) return { reply:'Mở tab Bán chè, điền Ngày/Khách hàng/Giá/kg/Cân nặng và bấm "Thêm đơn bán".', actions:[{ type:'navigate', tab:'sales', label:'Mở Bán chè' }] }
+  if (/(nhập|đơn nhập)/.test(low)) return { reply:'Mở tab Nhập chè, điền Ngày/Nhà cung cấp/Giá/kg/Cân nặng và bấm "Thêm đơn nhập".', actions:[{ type:'navigate', tab:'purchases', label:'Mở Nhập chè' }] }
+  if (/(chi phí|thêm chi)/.test(low)) return { reply:'Vào tab Chi phí, nhập Ngày/Mô tả/Số tiền/Loại, bấm "Thêm chi phí". Có thể đính kèm ảnh.', actions:[{ type:'navigate', tab:'expenses', label:'Mở Chi phí' }] }
+  if (/(ảnh|hóa đơn|bill|receipt)/.test(low)) return { reply:'Mở tab "Ảnh hóa đơn" để xem hoặc tìm theo Số HĐ, tháng/năm.', actions:[{ type:'navigate', tab:'receipts', label:'Mở Ảnh hóa đơn' }] }
+  return { reply:'Chưa hiểu yêu cầu. Bạn có thể hỏi: "Báo cáo tháng 11", "Tìm HĐ 00123", "Thêm đơn bán 20kg giá 100k".', actions:[] }
+}
+
+async function parseMarkPaid(text){
+  const s = String(text||'').toLowerCase()
+  const saleM = s.match(/(đánh dấu|mark).*(đã thanh toán|paid).*(đơn bán|bán)\s*(#?(\d+))/)
+  const purchM = s.match(/(đánh dấu|mark).*(đã thanh toán|paid).*(đơn nhập|nhập)\s*(#?(\d+))/)
+  if (saleM) {
+    const id = Number(saleM[4])
+    return { reply:`Đánh dấu đã thanh toán đơn bán #${id}?`, actions:[{ type:'post_api', method:'put', path:`/sales/${id}`, payload:{ payment_status:'paid' }, label:'Xác nhận' }] }
+  }
+  if (purchM) {
+    const id = Number(purchM[4])
+    return { reply:`Đánh dấu đã thanh toán đơn nhập #${id}?`, actions:[{ type:'post_api', method:'put', path:`/purchases/${id}`, payload:{ payment_status:'paid' }, label:'Xác nhận' }] }
+  }
+  return null
+}
+
+async function botReminders(req, msg){
+  try {
+    const days = 7; const weightThreshold = 2000;
+    const now = new Date(); const y = now.getFullYear(); const m = String(now.getMonth()+1).padStart(2,'0')
+    const threshold = new Date(now.getTime() - days*24*3600*1000)
+    const tStr = `${threshold.getFullYear()}-${String(threshold.getMonth()+1).padStart(2,'0')}-${String(threshold.getDate()).padStart(2,'0')}`
+    const out = []
+    if (MONGO_READY) {
+      const ownerFilter = (String(req.user?.role)==='admin') ? {} : { $or: [{ owner: String(req.user?.username||'') }, { created_by: String(req.user?.username||'') }] }
+      const [sOver, pOver, fixedCount, heavyCount] = await Promise.all([
+        mongoDb.collection('sales').countDocuments({ payment_status:'pending', sale_date: { $lte: tStr }, ...ownerFilter }),
+        mongoDb.collection('purchases').countDocuments({ payment_status:'pending', purchase_date: { $lte: tStr }, ...ownerFilter }),
+        mongoDb.collection('expenses').countDocuments({ expense_date: { $regex: `^${y}-${m}` }, category: /định/i, ...(String(req.user?.role)==='admin'?{}:{ owner: String(req.user?.username||'') }) }),
+        mongoDb.collection('purchases').countDocuments({ purchase_date: { $regex: `^${y}-${m}` }, weight: { $gt: weightThreshold }, ...ownerFilter })
+      ])
+      if (sOver) out.push(`Có ${sOver} đơn bán chưa thanh toán >${days} ngày`)
+      if (pOver) out.push(`Có ${pOver} đơn nhập chưa thanh toán >${days} ngày`)
+      if (!fixedCount) out.push('Định phí tháng này chưa được sinh tự động hoặc chưa có dữ liệu')
+      if (heavyCount) out.push(`Có ${heavyCount} đơn nhập vượt hạn mức trọng lượng (> ${weightThreshold} kg) trong tháng`)
+    } else if (SQLITE_READY) {
+      await new Promise((resolve) => {
+        db.get(`SELECT COUNT(*) AS c FROM sales WHERE payment_status = 'pending' AND sale_date <= ? ${String(req.user?.role)==='admin'?'':' AND owner = ?'}`, [tStr].concat(String(req.user?.role)==='admin'?[]:[String(req.user?.username||'')]), (e, r) => { if ((r?.c||0)) out.push(`Có ${r.c} đơn bán chưa thanh toán >${days} ngày`); resolve() })
+      })
+      await new Promise((resolve) => {
+        db.get(`SELECT COUNT(*) AS c FROM purchases WHERE payment_status = 'pending' AND purchase_date <= ? ${String(req.user?.role)==='admin'?'':' AND owner = ?'}`, [tStr].concat(String(req.user?.role)==='admin'?[]:[String(req.user?.username||'')]), (e, r) => { if ((r?.c||0)) out.push(`Có ${r.c} đơn nhập chưa thanh toán >${days} ngày`); resolve() })
+      })
+      await new Promise((resolve) => {
+        db.get(`SELECT COUNT(*) AS c FROM expenses WHERE strftime('%m', expense_date) = ? AND strftime('%Y', expense_date) = ? AND LOWER(COALESCE(category,'')) LIKE '%định%' ${String(req.user?.role)==='admin'?'':' AND owner = ?'}`, [m, String(y)].concat(String(req.user?.role)==='admin'?[]:[String(req.user?.username||'')]), (e, r) => { if (!(r?.c||0)) out.push('Định phí tháng này chưa được sinh tự động hoặc chưa có dữ liệu'); resolve() })
+      })
+      await new Promise((resolve) => {
+        db.get(`SELECT COUNT(*) AS c FROM purchases WHERE strftime('%m', purchase_date) = ? AND strftime('%Y', purchase_date) = ? AND weight > ? ${String(req.user?.role)==='admin'?'':' AND owner = ?'}`, [m, String(y), weightThreshold].concat(String(req.user?.role)==='admin'?[]:[String(req.user?.username||'')]), (e, r) => { if ((r?.c||0)) out.push(`Có ${r.c} đơn nhập vượt hạn mức trọng lượng (> ${weightThreshold} kg) trong tháng`); resolve() })
+      })
+    } else {
+      return { reply: 'DB chưa sẵn sàng', actions: [] }
+    }
+    const reply = out.length ? out.join(' • ') : 'Không có nhắc việc nào đáng chú ý'
+    const actions = [{ type:'navigate', tab:'balanceSheet', label:'Mở Bảng cân đối' }]
+    return { reply, actions }
+  } catch (e) {
+    return { reply: 'Bot nhắc việc lỗi', actions: [] }
+  }
+}
+
 // Sales endpoints
   app.get('/sales', requireAuth, (req, res) => {
     const { month, year, payment_status, q } = req.query;
@@ -747,6 +949,13 @@ app.post('/sales', rateLimit(60_000, 30, 'sales_post'), requireAuth, (req, res) 
 app.post('/bot', requireAuth, rateLimit(60_000, 30, 'bot'), async (req, res) => {
   try {
     const { message } = req.body || {}
+    const low = String(message||'').toLowerCase()
+    if (/(nhắc việc|việc cần làm|cảnh báo)/.test(low)) {
+      const r = await botReminders(req, low)
+      return res.json(r)
+    }
+    const mp = await parseMarkPaid(message)
+    if (mp) return res.json(mp)
     const r = await simpleBotReplyFull(message)
     res.json(r)
   } catch (e) {
