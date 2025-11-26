@@ -8,6 +8,16 @@
 .drawer.open{display:block}
 .drawer-panel{position:absolute;top:0;left:0;width:280px;height:100%;background:var(--surface);border-right:1px solid var(--border);box-shadow:0 8px 24px var(--shadow);padding:16px;display:flex;flex-direction:column;gap:10px;z-index:2001}
 .drawer-close{position:absolute;top:10px;right:10px}
+.chatbot{position:fixed;right:18px;bottom:18px;z-index:60}
+.chatbot-toggle{background:#4A5568;color:#fff;border:none;border-radius:22px;padding:10px 14px;cursor:pointer}
+.chatbot-panel{position:fixed;right:18px;bottom:68px;width:320px;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 6px 16px rgba(0,0,0,.12);display:flex;flex-direction:column;overflow:hidden}
+.chatbot-header{padding:10px 12px;font-weight:700;background:var(--bg2);border-bottom:1px solid var(--border)}
+.chatbot-list{padding:10px;height:260px;overflow:auto;display:flex;flex-direction:column;gap:8px}
+.chatbot-input{display:flex;gap:8;padding:10px;border-top:1px solid var(--border)}
+.chatbot-input input{flex:1;height:36px;border:1px solid var(--border);border-radius:8px;padding:0 10px}
+.msg{max-width:85%;padding:8px 10px;border-radius:10px}
+.msg.user{align-self:flex-end;background:#DCFCE7}
+.msg.bot{align-self:flex-start;background:#F1F5F9}
 .btn{padding:10px 14px;border:1px solid var(--border);background:var(--accent);color:var(--text);cursor:pointer;border-radius:12px;transition:.2s ease;box-shadow:0 1px 2px var(--shadow)}
 .btn:hover{background:#eef2ff;border-color:#93c5fd}
 .btn:active{transform:translateY(1px)}

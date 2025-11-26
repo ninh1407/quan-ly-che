@@ -12,6 +12,7 @@ export default function Receipts() {
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [partial, setPartial] = useState(false)
   const origin = (typeof window !== 'undefined') ? window.location.origin : ''
   const token = (typeof window !== 'undefined') ? (localStorage.getItem('token')||'') : ''
   const monthOptions = useMemo(() => Array.from({length:12}, (_,i)=> i+1), [])
@@ -25,6 +26,7 @@ export default function Receipts() {
       if (q) params.q = q
       const r = await api.get('/receipts', { params })
       setList(Array.isArray(r.data) ? r.data : [])
+      setPartial(false)
     } catch (e) {
       try {
         const base = { month, year }
@@ -34,13 +36,15 @@ export default function Receipts() {
           api.get('/expenses', { params: base })
         ])
         let items = []
-        const add = (arr, t, dateKey) => { (arr||[]).forEach(r => { if (r.receipt_path) items.push({ type:t, id:r.id, date:r[dateKey], owner:r.owner||r.created_by||null, invoice_no:r.invoice_no||null }) }) }
+        const add = (arr, t, dateKey) => { (arr||[]).forEach(r => { if (r.receipt_path) { const inv = r.invoice_no || r.ticket_name || r.weigh_ticket_code || r.contract || ''; items.push({ type:t, id:r.id, date:r[dateKey], owner:r.owner||r.created_by||null, invoice_no: inv }) } }) }
         if (type==='all' || type==='sales') add(rs.data||[], 'sales', 'sale_date')
         if (type==='all' || type==='purchases') add(rp.data||[], 'purchases', 'purchase_date')
         if (type==='all' || type==='expenses') add(re.data||[], 'expenses', 'expense_date')
         if (q) { const s=q.toLowerCase(); items = items.filter(r => String(r.invoice_no||'').toLowerCase().includes(s)) }
         items.sort((a,b)=> String(b.date||'').localeCompare(String(a.date||'')))
         setList(items)
+        setPartial(true)
+        setError('')
       } catch (e2) {
         setError(e?.response?.data?.message || e2?.response?.data?.message || 'Tải ảnh lỗi')
       }
@@ -68,6 +72,7 @@ export default function Receipts() {
         <input value={q} onChange={(e)=> setQ(e.target.value)} placeholder="Nhập Số HĐ" />
       </div>
       {error && <div className="error" style={{ marginTop:8 }}>{error}</div>}
+      {!error && partial && <div className="muted" style={{ marginTop:8 }}>Một số mục lỗi, đang hiển thị phần khả dụng</div>}
       <div className="table-wrap" style={{ marginTop:12 }}>
         {loading ? 'Đang tải...' : (
           <table className="table">

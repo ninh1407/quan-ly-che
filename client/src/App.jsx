@@ -19,6 +19,7 @@ import Breadcrumb from './components/Breadcrumb.jsx'
 import Admin from './pages/Admin.jsx'
 import ChangePassword from './pages/ChangePassword.jsx'
 import Receipts from './pages/Receipts.jsx'
+import ChatBot from './components/ChatBot.jsx'
 
 export default function App() {
   const [tab, setTab] = useState('dashboard')
@@ -50,6 +51,11 @@ export default function App() {
     return () => window.removeEventListener('keydown', h)
   }, [])
   React.useEffect(() => { (async () => { try { const r = await api.get('/notifications'); const items = r.data||[]; setNotifs(items); } catch {} })() }, [notifOpen])
+  React.useEffect(() => {
+    const h = (e) => { const tabName = e.detail; if (typeof tabName === 'string') go(tabName) }
+    window.addEventListener('chatbot:navigate', h)
+    return () => window.removeEventListener('chatbot:navigate', h)
+  }, [])
   if (!authed) {
     return (
       <div className="container">
@@ -130,6 +136,8 @@ export default function App() {
           {tab === 'stats' && <Stats />}
           {tab === 'tradeStats' && <TradeStats />}
           {tab === 'admin' && <Admin />}
+          <ChatBot />
+          <ChatBot />
       {accountOpen && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.35)', display:'flex', alignItems:'center', justifyContent:'center' }}>
           <div className="card" style={{ width: 380 }}>

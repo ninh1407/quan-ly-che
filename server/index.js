@@ -743,6 +743,17 @@ app.post('/sales', rateLimit(60_000, 30, 'sales_post'), requireAuth, (req, res) 
   runInsert(SALES_HAS_TOTAL_AMOUNT || true);
 });
 
+// Bot endpoint
+app.post('/bot', requireAuth, rateLimit(60_000, 30, 'bot'), async (req, res) => {
+  try {
+    const { message } = req.body || {}
+    const r = await simpleBotReplyFull(message)
+    res.json(r)
+  } catch (e) {
+    res.status(500).json({ message: 'Bot error' })
+  }
+})
+
 app.put('/sales/:id', rateLimit(60_000, 60, 'sales_put'), requireAuth, (req, res) => {
   const id = req.params.id;
   const { sale_date, customer_name, tea_type, price_per_kg, weight, payment_status, ticket_name, invoice_no, contract, created_by, issued_by, export_type, country, receipt_data, receipt_name } = req.body;
@@ -2868,3 +2879,19 @@ function broadcastEvent(event, data) {
   } catch {}
 }
 // (license feature removed)
+function simpleBotReply(text) {
+  const msg = String(text||'').trim().toLowerCase()
+  if (!msg) return 'Bạn cần hỏi gì? Ví dụ: "Hướng dẫn nhập đơn"'
+  const intents = [
+    { k: ['help','trợ giúp','hướng dẫn'], r: 'Các mục chính: Tổng quan, Bán, Nhập, Chi phí, Công nợ, Ảnh hóa đơn. Bạn muốn làm gì?' },
+    { k: ['bán','đơn bán','thêm bán'], r: 'Mở tab Bán chè, điền Ngày/Khách hàng/Giá/kg/Cân nặng và bấm "Thêm đơn bán".' },
+    { k: ['nhập','đơn nhập','thêm nhập'], r: 'Mở tab Nhập chè, điền Ngày/Nhà cung cấp/Giá/kg/Cân nặng và bấm "Thêm đơn nhập".' },
+    { k: ['chi phí','thêm chi'], r: 'Vào tab Chi phí, nhập Ngày/Mô tả/Số tiền/Loại, bấm "Thêm chi phí". Có thể đính kèm ảnh.' },
+    { k: ['ảnh','hóa đơn','bill','receipt'], r: 'Mở tab "Ảnh hóa đơn" để xem hoặc tìm theo Số HĐ, tháng/năm.' },
+    { k: ['công nợ','nợ','phải thu','phải trả'], r: 'Xem mục Công nợ để theo dõi phải thu/phải trả theo thời gian.' },
+  ]
+  for (const it of intents) {
+    if (it.k.some(w => msg.includes(w))) return it.r
+  }
+  return 'Chưa hiểu yêu cầu. Bạn có thể hỏi: "Hướng dẫn nhập đơn", "Xem ảnh hóa đơn", "Thêm chi phí".'
+}
