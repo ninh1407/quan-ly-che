@@ -1000,26 +1000,39 @@ async function botReminders(req, msg){
       })))).catch(err => res.status(500).json({ message: 'DB error', detail: err.message }));
     }
   if (!SQLITE_READY) return res.status(500).json({ message: 'DB error', detail: 'SQLite disabled' });
-  const where = [];
-  const params = [];
-  if (month && year) {
-    where.push("strftime('%m', sale_date) = ?"); params.push(pad2(month));
-    where.push("strftime('%Y', sale_date) = ?"); params.push(String(year));
-  }
-  if (payment_status && payment_status !== 'all') {
-    where.push('payment_status = ?'); params.push(payment_status);
-  }
-  if (q) {
-    where.push('(customer_name LIKE ? OR tea_type LIKE ? OR ticket_name LIKE ? OR invoice_no LIKE ?)');
-    params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
-  }
-  if (!hasRole(req, 'admin')) { const u = String(req.user?.username || ''); where.push('owner = ?'); params.push(u) }
-  const sql = `SELECT id, sale_date, customer_name, tea_type, price_per_kg, weight, payment_status, ticket_name, invoice_no, contract, created_by, owner, issued_by, export_type, country, receipt_path,
-    (price_per_kg * weight) AS total_amount FROM sales ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY sale_date ASC, id ASC`;
-  db.all(sql, params, (err, rows) => {
-    if (err) return res.status(500).json({ message: 'DB error', detail: err.message });
-    res.json(rows);
-  });
+  db.all(`PRAGMA table_info(sales)`, [], (eCols, cols) => {
+    const has = (name) => !eCols && (cols||[]).some(r => r.name === name)
+    const where = []
+    const params = []
+    if (month && year) { where.push("strftime('%m', sale_date) = ?"); params.push(pad2(month)); where.push("strftime('%Y', sale_date) = ?"); params.push(String(year)) }
+    if (payment_status && payment_status !== 'all') { where.push('payment_status = ?'); params.push(payment_status) }
+    if (q) { where.push('(customer_name LIKE ? OR tea_type LIKE ?'+(has('ticket_name')?' OR ticket_name LIKE ?':'')+(has('invoice_no')?' OR invoice_no LIKE ?':'')+')'); const like = `%${q}%`; params.push(like, like); if (has('ticket_name')) params.push(like); if (has('invoice_no')) params.push(like) }
+    if (!hasRole(req, 'admin') && has('owner')) { const u = String(req.user?.username || ''); where.push('owner = ?'); params.push(u) }
+    const sel = [
+      'id',
+      'sale_date',
+      has('customer_name') ? 'customer_name' : `NULL AS customer_name`,
+      has('tea_type') ? 'tea_type' : `NULL AS tea_type`,
+      has('price_per_kg') ? 'price_per_kg' : `0 AS price_per_kg`,
+      has('weight') ? 'weight' : `0 AS weight`,
+      has('payment_status') ? 'payment_status' : `NULL AS payment_status`,
+      has('ticket_name') ? 'ticket_name' : `NULL AS ticket_name`,
+      has('invoice_no') ? 'invoice_no' : `NULL AS invoice_no`,
+      has('contract') ? 'contract' : `NULL AS contract`,
+      has('created_by') ? 'created_by' : `NULL AS created_by`,
+      has('owner') ? 'owner' : `NULL AS owner`,
+      has('issued_by') ? 'issued_by' : `NULL AS issued_by`,
+      has('export_type') ? 'export_type' : `NULL AS export_type`,
+      has('country') ? 'country' : `NULL AS country`,
+      has('receipt_path') ? 'receipt_path' : `NULL AS receipt_path`,
+      (has('price_per_kg') && has('weight')) ? '(price_per_kg * weight) AS total_amount' : '0 AS total_amount'
+    ].join(', ')
+    const sql = `SELECT ${sel} FROM sales ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY sale_date ASC, id ASC`
+    db.all(sql, params, (err, rows) => {
+      if (err) return res.status(500).json({ message: 'DB error', detail: err.message })
+      res.json(rows)
+    })
+  })
 });
 
 app.post('/sales', rateLimit(60_000, 30, 'sales_post'), requireAuth, (req, res) => {
@@ -1377,27 +1390,49 @@ app.get('/sales/:id/receipt', requireAuth, (req, res) => {
       })))).catch(err => res.status(500).json({ message: 'DB error', detail: err.message }));
   }
   if (!SQLITE_READY) return res.status(500).json({ message: 'DB error', detail: 'SQLite disabled' });
-  const where = [];
-  const params = [];
-  if (month && year) {
-    where.push("strftime('%m', purchase_date) = ?"); params.push(pad2(month));
-    where.push("strftime('%Y', purchase_date) = ?"); params.push(String(year));
-  }
-  if (payment_status && payment_status !== 'all') {
-    where.push('payment_status = ?'); params.push(payment_status);
-  }
-  if (q) {
-    where.push('(supplier_name LIKE ? OR ticket_name LIKE ? OR invoice_no LIKE ? OR vehicle_plate LIKE ?)');
-    params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
-  }
-  if (!hasRole(req, 'admin')) { where.push('owner = ?'); params.push(String(req.user?.username || '')) }
-  const totalExpr = PURCHASES_HAS_TOTAL_COST ? 'COALESCE(total_cost, (unit_price * COALESCE(net_weight, weight)))' : '(unit_price * COALESCE(net_weight, weight))';
-  const sql = `SELECT id, purchase_date, supplier_name, weight, unit_price, payment_status, water_percent, net_weight, ticket_name, invoice_no, weigh_ticket_code, vehicle_plate, owner, receipt_path,
-    ${totalExpr} AS total_cost FROM purchases ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY purchase_date ASC, id ASC`;
-  db.all(sql, params, (err, rows) => {
-    if (err) return res.status(500).json({ message: 'DB error', detail: err.message });
-    res.json(rows);
-  });
+  db.all(`PRAGMA table_info(purchases)`, [], (eCols, cols) => {
+    const has = (name) => !eCols && (cols||[]).some(r => r.name === name)
+    const where = []
+    const params = []
+    if (month && year) { where.push("strftime('%m', purchase_date) = ?"); params.push(pad2(month)); where.push("strftime('%Y', purchase_date) = ?"); params.push(String(year)) }
+    if (payment_status && payment_status !== 'all') { where.push('payment_status = ?'); params.push(payment_status) }
+    if (q) {
+      const like = `%${q}%`
+      const parts = ['supplier_name LIKE ?']
+      params.push(like)
+      if (has('ticket_name')) { parts.push('ticket_name LIKE ?'); params.push(like) }
+      if (has('invoice_no')) { parts.push('invoice_no LIKE ?'); params.push(like) }
+      if (has('weigh_ticket_code')) { parts.push('weigh_ticket_code LIKE ?'); params.push(like) }
+      if (has('vehicle_plate')) { parts.push('vehicle_plate LIKE ?'); params.push(like) }
+      where.push('('+parts.join(' OR ')+')')
+    }
+    if (!hasRole(req, 'admin') && has('owner')) { where.push('owner = ?'); params.push(String(req.user?.username || '')) }
+    const totalExpr = (has('unit_price') && (has('net_weight') || has('weight')))
+      ? ' (unit_price * COALESCE(net_weight, weight)) '
+      : ' 0 '
+    const sel = [
+      'id',
+      'purchase_date',
+      has('supplier_name') ? 'supplier_name' : `NULL AS supplier_name`,
+      has('weight') ? 'weight' : `0 AS weight`,
+      has('unit_price') ? 'unit_price' : `0 AS unit_price`,
+      has('payment_status') ? 'payment_status' : `NULL AS payment_status`,
+      has('water_percent') ? 'water_percent' : `NULL AS water_percent`,
+      has('net_weight') ? 'net_weight' : (has('weight') ? 'weight AS net_weight' : '0 AS net_weight'),
+      has('ticket_name') ? 'ticket_name' : `NULL AS ticket_name`,
+      has('invoice_no') ? 'invoice_no' : `NULL AS invoice_no`,
+      has('weigh_ticket_code') ? 'weigh_ticket_code' : `NULL AS weigh_ticket_code`,
+      has('vehicle_plate') ? 'vehicle_plate' : `NULL AS vehicle_plate`,
+      has('owner') ? 'owner' : `NULL AS owner`,
+      has('receipt_path') ? 'receipt_path' : `NULL AS receipt_path`,
+      (PURCHASES_HAS_TOTAL_COST && has('total_cost')) ? 'COALESCE(total_cost, '+totalExpr+') AS total_cost' : (totalExpr+' AS total_cost')
+    ].join(', ')
+    const sql = `SELECT ${sel} FROM purchases ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY purchase_date ASC, id ASC`
+    db.all(sql, params, (err, rows) => {
+      if (err) return res.status(500).json({ message: 'DB error', detail: err.message })
+      res.json(rows)
+    })
+  })
 });
 
 app.post('/purchases', rateLimit(60_000, 30, 'purchases_post'), requireAuth, (req, res) => {

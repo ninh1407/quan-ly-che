@@ -92,7 +92,7 @@ export default function Purchases() {
         if (va<vb) return -1*asc; if (va>vb) return 1*asc; return 0;
       })
       setList(data);
-    } catch (e) { setError(e?.response?.data?.message || 'Tải danh sách lỗi'); }
+    } catch (e) { setError(e?.response?.data?.detail || e?.response?.data?.message || e?.message || 'Tải danh sách lỗi'); }
     finally { setLoading(false); }
   };
 
