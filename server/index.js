@@ -253,6 +253,53 @@ function rateLimit(windowMs, max, bucket) {
     next();
   }
 }
+let OPENAI_API_KEY_RUNTIME = process.env.OPENAI_API_KEY || ''
+let OPENAI_MODEL_RUNTIME = process.env.OPENAI_MODEL || 'gpt-4o-mini'
+function openaiTools(){ return [
+  { type:'function', function:{ name:'create_sale', parameters:{ type:'object', properties:{ sale_date:{type:'string'}, customer_name:{type:'string'}, tea_type:{type:'string'}, price_per_kg:{type:'number'}, weight:{type:'number'}, payment_status:{type:'string'}, ticket_name:{type:'string'}, invoice_no:{type:'string'}, contract:{type:'string'}, issued_by:{type:'string'}, export_type:{type:'string'}, country:{type:'string'} }, required:['sale_date','customer_name','price_per_kg','weight'] } } },
+  { type:'function', function:{ name:'update_sale', parameters:{ type:'object', properties:{ id:{type:'number'}, sale_date:{type:'string'}, customer_name:{type:'string'}, tea_type:{type:'string'}, price_per_kg:{type:'number'}, weight:{type:'number'}, payment_status:{type:'string'}, ticket_name:{type:'string'}, invoice_no:{type:'string'}, contract:{type:'string'}, created_by:{type:'string'}, issued_by:{type:'string'}, export_type:{type:'string'}, country:{type:'string'}, receipt_data:{type:'string'}, receipt_name:{type:'string'} }, required:['id'] } } },
+  { type:'function', function:{ name:'delete_sale', parameters:{ type:'object', properties:{ id:{type:'number'} }, required:['id'] } } },
+  { type:'function', function:{ name:'mark_sale_paid', parameters:{ type:'object', properties:{ id:{type:'number'}, receipt_data:{type:'string'}, receipt_name:{type:'string'} }, required:['id'] } } },
+  { type:'function', function:{ name:'create_purchase', parameters:{ type:'object', properties:{ purchase_date:{type:'string'}, supplier_name:{type:'string'}, weight:{type:'number'}, unit_price:{type:'number'}, payment_status:{type:'string'}, water_percent:{type:'number'}, net_weight:{type:'number'}, ticket_name:{type:'string'}, invoice_no:{type:'string'}, weigh_ticket_code:{type:'string'}, vehicle_plate:{type:'string'} }, required:['purchase_date','supplier_name','weight','unit_price'] } } },
+  { type:'function', function:{ name:'update_purchase', parameters:{ type:'object', properties:{ id:{type:'number'}, purchase_date:{type:'string'}, supplier_name:{type:'string'}, weight:{type:'number'}, unit_price:{type:'number'}, payment_status:{type:'string'}, water_percent:{type:'number'}, net_weight:{type:'number'}, ticket_name:{type:'string'}, invoice_no:{type:'string'}, weigh_ticket_code:{type:'string'}, vehicle_plate:{type:'string'}, receipt_data:{type:'string'}, receipt_name:{type:'string'} }, required:['id'] } } },
+  { type:'function', function:{ name:'delete_purchase', parameters:{ type:'object', properties:{ id:{type:'number'} }, required:['id'] } } },
+  { type:'function', function:{ name:'mark_purchase_paid', parameters:{ type:'object', properties:{ id:{type:'number'}, receipt_data:{type:'string'}, receipt_name:{type:'string'} }, required:['id'] } } },
+  { type:'function', function:{ name:'create_expense', parameters:{ type:'object', properties:{ expense_date:{type:'string'}, description:{type:'string'}, amount:{type:'number'}, category:{type:'string'}, receipt_data:{type:'string'}, receipt_name:{type:'string'} }, required:['expense_date','description','amount'] } } },
+  { type:'function', function:{ name:'update_expense', parameters:{ type:'object', properties:{ id:{type:'number'}, expense_date:{type:'string'}, description:{type:'string'}, amount:{type:'number'}, category:{type:'string'}, receipt_data:{type:'string'}, receipt_name:{type:'string'} }, required:['id'] } } },
+  { type:'function', function:{ name:'delete_expense', parameters:{ type:'object', properties:{ id:{type:'number'} }, required:['id'] } } },
+  { type:'function', function:{ name:'find_receipts', parameters:{ type:'object', properties:{ q:{type:'string'}, type:{type:'string'}, month:{type:'number'}, year:{type:'number'} } } } },
+  { type:'function', function:{ name:'kpi_month', parameters:{ type:'object', properties:{ month:{type:'number'}, year:{type:'number'} } } } },
+  { type:'function', function:{ name:'top_customers_month', parameters:{ type:'object', properties:{ month:{type:'number'}, year:{type:'number'} } } } },
+  { type:'function', function:{ name:'top_suppliers_month', parameters:{ type:'object', properties:{ month:{type:'number'}, year:{type:'number'} } } } }
+] }
+async function chatgptReply(message){
+  try {
+    if (!OPENAI_API_KEY_RUNTIME) return null
+    const body = {
+      model: OPENAI_MODEL_RUNTIME,
+      messages: [
+        { role:'system', content:'Bạn là trợ lý cho hệ thống thu mua chè. Trả lời tiếng Việt. Khi người dùng yêu cầu thao tác, hãy gọi function tương ứng với tham số chuẩn.' },
+        { role:'user', content:String(message||'') }
+      ],
+      tools: openaiTools(),
+      tool_choice: 'auto'
+    }
+    const r = await fetch('https://api.openai.com/v1/chat/completions', { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+OPENAI_API_KEY_RUNTIME }, body: JSON.stringify(body) })
+    const data = await r.json()
+    const c = Array.isArray(data.choices) ? data.choices[0] : null
+    const msg = c && c.message ? c.message : {}
+    const out = { reply: msg.content || 'OK', actions: [] }
+    const tc = msg.tool_calls || []
+    if (Array.isArray(tc) && tc.length){
+      tc.forEach(t => {
+        let args = {}
+        try { args = t.function && t.function.arguments ? JSON.parse(t.function.arguments) : {} } catch {}
+        out.actions.push({ type:'function_call', name: String(t.function?.name||''), args, label:'Thực hiện' })
+      })
+    }
+    return out
+  } catch { return null }
+}
 if (!MONGO_SKIP) {
   try {
     const client = new MongoClient(MONGO_URL, { serverSelectionTimeoutMS: 2000 });
@@ -1010,11 +1057,30 @@ app.post('/bot', requireAuth, rateLimit(60_000, 30, 'bot'), async (req, res) => 
     }
     const mp = await parseMarkPaid(message)
     if (mp) return res.json(mp)
+    if (OPENAI_API_KEY_RUNTIME) {
+      const rAi = await chatgptReply(message)
+      if (rAi && (rAi.actions?.length || rAi.reply)) return res.json(rAi)
+    }
     const r = await simpleBotReplyFull(message)
     res.json(r)
   } catch (e) {
     res.status(500).json({ message: 'Bot error', detail: String(e?.message||'') })
   }
+})
+app.get('/admin/bot/config', requireAdmin, (req, res) => {
+  res.json({ openai_enabled: !!OPENAI_API_KEY_RUNTIME, model: OPENAI_MODEL_RUNTIME })
+})
+app.post('/admin/bot/config', requireAdmin, (req, res) => {
+  const { openai_api_key, model, enabled } = req.body || {}
+  if (enabled === false) OPENAI_API_KEY_RUNTIME = ''
+  if (typeof openai_api_key === 'string') OPENAI_API_KEY_RUNTIME = openai_api_key
+  if (typeof model === 'string' && model) OPENAI_MODEL_RUNTIME = model
+  res.json({ ok: true, openai_enabled: !!OPENAI_API_KEY_RUNTIME, model: OPENAI_MODEL_RUNTIME })
+})
+app.post('/admin/bot/test', requireAdmin, async (req, res) => {
+  const { message } = req.body || {}
+  const r = await chatgptReply(message)
+  res.json(r || { reply:'AI chưa bật', actions:[] })
 })
 try { app.use('/bot', require('./routes/bot')) } catch {}
 
