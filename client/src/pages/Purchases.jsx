@@ -68,17 +68,7 @@ export default function Purchases() {
       if (q) {
         const s = q.toLowerCase();
         data = data.filter(r => [r.invoice_no, r.ticket_name, r.weigh_ticket_code, r.vehicle_plate, r.supplier_name].some(v => String(v||'').toLowerCase().includes(s)));
-  }
-  React.useEffect(() => {
-    try {
-      const p = localStorage.getItem('prefill_purchases');
-      if (p) {
-        const v = JSON.parse(p);
-        setForm(f => ({ ...f, ...v, unit_price: formatMoneyInput(v.unit_price||''), weight: v.weight||'' }));
-        localStorage.removeItem('prefill_purchases');
       }
-    } catch {}
-  }, [])
       if (range.from || range.to) {
         data = data.filter(r => {
           const d = new Date(r.purchase_date);
@@ -98,6 +88,16 @@ export default function Purchases() {
 
   useEffect(() => { load(); }, [month, year, paymentFilter]);
   useEffect(() => { const t = setTimeout(() => { load(); }, 250); return () => clearTimeout(t) }, [q]);
+  useEffect(() => {
+    try {
+      const p = localStorage.getItem('prefill_purchases');
+      if (p) {
+        const v = JSON.parse(p);
+        setForm(f => ({ ...f, ...v, unit_price: formatMoneyInput(v.unit_price||''), weight: v.weight||'' }));
+        localStorage.removeItem('prefill_purchases');
+      }
+    } catch {}
+  }, [])
   useEffect(() => {
     (async () => {
       try { const r = await api.get('/suppliers'); setSuppliers(r.data || []); } catch {}

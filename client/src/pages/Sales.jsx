@@ -93,17 +93,7 @@ export default function Sales() {
       if (q) {
         const s = q.toLowerCase();
         data = data.filter(r => [r.invoice_no, r.ticket_name, r.contract, r.customer_name, r.tea_type, r.created_by, r.issued_by].some(v => String(v||'').toLowerCase().includes(s)));
-  }
-  React.useEffect(() => {
-    try {
-      const p = localStorage.getItem('prefill_sales');
-      if (p) {
-        const v = JSON.parse(p);
-        setForm(f => ({ ...f, ...v, price_per_kg: formatMoneyInput(v.price_per_kg||''), weight: v.weight||'' }));
-        localStorage.removeItem('prefill_sales');
       }
-    } catch {}
-  }, [])
       if (range.from || range.to) {
         data = data.filter(r => {
           const d = new Date(r.sale_date);
@@ -125,6 +115,16 @@ export default function Sales() {
 
   useEffect(() => { load(); }, [month, year, paymentFilter]);
   useEffect(() => { const t = setTimeout(() => { load(); }, 250); return () => clearTimeout(t) }, [q]);
+  useEffect(() => {
+    try {
+      const p = localStorage.getItem('prefill_sales');
+      if (p) {
+        const v = JSON.parse(p);
+        setForm(f => ({ ...f, ...v, price_per_kg: formatMoneyInput(v.price_per_kg||''), weight: v.weight||'' }));
+        localStorage.removeItem('prefill_sales');
+      }
+    } catch {}
+  }, [])
   useEffect(() => {
     (async () => {
       try { const c = await api.get('/customers'); setCustomers(c.data || []); } catch {}
