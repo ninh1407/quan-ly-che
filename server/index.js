@@ -41,7 +41,8 @@ app.use('/public', express.static(path.join(__dirname,'public')));
 
 let db = null;
 let SQLITE_READY = false;
-const dbPath = process.env.DB_PATH || path.join(__dirname, 'data.db');
+const dbPathEnv = process.env.DB_PATH;
+const dbPath = dbPathEnv ? (path.isAbsolute(dbPathEnv) ? dbPathEnv : path.join(__dirname, dbPathEnv)) : path.join(__dirname, 'data.db');
 const SQLITE_SKIP = String(process.env.DISABLE_SQLITE||'').toLowerCase() === 'true' || String(process.env.DISABLE_SQLITE||'') === '1'
 try {
   if (!SQLITE_SKIP) {

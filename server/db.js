@@ -4,7 +4,8 @@ let sqlite3 = null
 let READY = false
 let LOAD_ERR = ''
 try { sqlite3 = require('sqlite3').verbose(); READY = true } catch (e) { LOAD_ERR = String(e.message||''); console.warn('BOT SQLite load error:', LOAD_ERR) }
-const DB_PATH = process.env.BOT_DB_PATH || path.join(__dirname, 'database.sqlite')
+const DB_ENV = process.env.BOT_DB_PATH
+const DB_PATH = DB_ENV ? (path.isAbsolute(DB_ENV) ? DB_ENV : path.join(__dirname, DB_ENV)) : path.join(__dirname, 'database.sqlite')
 try { const dir = path.dirname(DB_PATH); if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true }) } catch {}
 const db = READY ? new sqlite3.Database(DB_PATH) : null
 function run(sql, params=[]) { if (!READY) return Promise.reject(new Error('SQLite not available: '+LOAD_ERR)); return new Promise((resolve, reject) => db.run(sql, params, function(e){ if (e) return reject(e); resolve({ lastID: this.lastID, changes: this.changes }) })) }
