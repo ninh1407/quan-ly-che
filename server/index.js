@@ -288,7 +288,7 @@ async function chatgptReply(message){
     const data = await r.json()
     const c = Array.isArray(data.choices) ? data.choices[0] : null
     const msg = c && c.message ? c.message : {}
-    const out = { reply: msg.content || 'OK', actions: [] }
+    const out = { reply: msg.content || '', actions: [] }
     const tc = msg.tool_calls || []
     if (Array.isArray(tc) && tc.length){
       tc.forEach(t => {
@@ -296,7 +296,30 @@ async function chatgptReply(message){
         try { args = t.function && t.function.arguments ? JSON.parse(t.function.arguments) : {} } catch {}
         out.actions.push({ type:'function_call', name: String(t.function?.name||''), args, label:'Thực hiện' })
       })
+      if (!out.reply) {
+        const labels = out.actions.map(a => {
+          const n = String(a.name||'')
+          if (n==='create_sale') return 'Tạo đơn bán'
+          if (n==='update_sale') return 'Sửa đơn bán'
+          if (n==='delete_sale') return 'Xóa đơn bán'
+          if (n==='mark_sale_paid') return 'Đánh dấu đã thanh toán đơn bán'
+          if (n==='create_purchase') return 'Tạo đơn nhập'
+          if (n==='update_purchase') return 'Sửa đơn nhập'
+          if (n==='delete_purchase') return 'Xóa đơn nhập'
+          if (n==='mark_purchase_paid') return 'Đánh dấu đã thanh toán đơn nhập'
+          if (n==='create_expense') return 'Tạo chi phí'
+          if (n==='update_expense') return 'Sửa chi phí'
+          if (n==='delete_expense') return 'Xóa chi phí'
+          if (n==='find_receipts') return 'Tìm ảnh hóa đơn'
+          if (n==='kpi_month') return 'Báo cáo KPI tháng'
+          if (n==='top_customers_month') return 'Top khách hàng tháng'
+          if (n==='top_suppliers_month') return 'Top nhà cung cấp tháng'
+          return 'Hành động'
+        })
+        out.reply = `Đã sinh ${out.actions.length} hành động: ${labels.join(' • ')}`
+      }
     }
+    if (!out.reply) out.reply = 'OK'
     return out
   } catch { return null }
 }
@@ -1059,7 +1082,7 @@ app.post('/bot', requireAuth, rateLimit(60_000, 30, 'bot'), async (req, res) => 
     if (mp) return res.json(mp)
     if (OPENAI_API_KEY_RUNTIME) {
       const rAi = await chatgptReply(message)
-      if (rAi && (rAi.actions?.length || rAi.reply)) return res.json(rAi)
+      if (rAi && ((Array.isArray(rAi.actions) && rAi.actions.length>0) || (rAi.reply && rAi.reply.trim() && rAi.reply.trim()!=='OK'))) return res.json(rAi)
     }
     const r = await simpleBotReplyFull(message)
     res.json(r)
