@@ -12,7 +12,7 @@ export default function ChatBot() {
   useEffect(() => { try { localStorage.setItem('chatbot_msgs', JSON.stringify(msgs)) } catch {} }, [msgs])
   useEffect(() => { if (open && listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight }, [open, msgs])
 
-  const handleAction = (a) => {
+  const handleAction = async (a) => {
     try {
       if (a.type === 'open_url') {
         const origin = window.location.origin
