@@ -31,6 +31,7 @@ export default function App() {
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifs, setNotifs] = useState([])
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [badges, setBadges] = useState({ sales: 0, purchases: 0 })
   const rolesRaw = (() => { try { const r = JSON.parse(localStorage.getItem('roles')||'null'); if (Array.isArray(r)) return r; } catch {} const s = (localStorage.getItem('role')||'user'); return String(s).split(',').map(x=>x.trim()).filter(Boolean) })()
   const hasRole = (name) => rolesRaw.includes(name)
   const allowedTabs = hasRole('admin')
@@ -41,7 +42,7 @@ export default function App() {
         ...(hasRole('finance') ? ['dashboard','balanceSheet','expenses','debts','receipts'] : []),
         'customers','suppliers','changePwd'
       ]))
-  const go = (k) => { if (allowedTabs.includes(k)) setTab(k); else toast('Không có quyền truy cập') }
+  const go = (k) => { if (allowedTabs.includes(k)) { setTab(k); try { localStorage.setItem('current_tab', k) } catch {} } else toast('Không có quyền truy cập') }
   React.useEffect(() => { if (!allowedTabs.includes(tab)) setTab(allowedTabs[0]) }, [])
   React.useEffect(() => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('theme', theme) }, [theme])
   React.useEffect(() => { document.documentElement.setAttribute('data-device', 'pc'); localStorage.setItem('device', 'pc') }, [])
@@ -51,6 +52,29 @@ export default function App() {
     return () => window.removeEventListener('keydown', h)
   }, [])
   React.useEffect(() => { (async () => { try { const r = await api.get('/notifications'); const items = r.data||[]; setNotifs(items); } catch {} })() }, [notifOpen])
+  React.useEffect(() => {
+    let timer = null
+    const extractCount = (arr, re) => {
+      for (const s of (arr||[])) { const m = String(s).match(re); if (m) return Number(m[1]||0) }
+      return 0
+    }
+    const loadBadges = async () => {
+      try {
+        const [r7, r30] = await Promise.all([
+          api.get('/notifications', { params: { days: 7 } }),
+          api.get('/notifications', { params: { days: 30 } })
+        ])
+        const a7 = r7.data || []
+        const a30 = r30.data || []
+        const salesOver7 = extractCount(a7, /Có\s+(\d+)\s+đơn bán chưa thanh toán/i)
+        const purchasesOver30 = extractCount(a30, /Có\s+(\d+)\s+đơn nhập chưa thanh toán/i)
+        setBadges({ sales: salesOver7||0, purchases: purchasesOver30||0 })
+      } catch {}
+    }
+    loadBadges()
+    timer = setInterval(loadBadges, 60_000)
+    return () => { if (timer) clearInterval(timer) }
+  }, [])
   React.useEffect(() => {
     const h = (e) => { const tabName = e.detail; if (typeof tabName === 'string') go(tabName) }
     window.addEventListener('chatbot:navigate', h)
@@ -113,7 +137,11 @@ export default function App() {
                     { key:'changePwd', label:'🔑 Đổi mật khẩu' }
                   ]
             ).map(item => (
-              <button key={item.key} className={`btn ${tab===item.key?'primary':''}`} onClick={() => { go(item.key); setMenuOpen(false) }}>{item.label}</button>
+              <button key={item.key} className={`btn ${tab===item.key?'primary':''}`} onClick={() => { go(item.key); setMenuOpen(false) }}>
+                <span>{item.label}</span>
+                {item.key==='sales' && badges.sales>0 && <span style={{ marginLeft:8 }} className="badge">{badges.sales}</span>}
+                {item.key==='purchases' && badges.purchases>0 && <span style={{ marginLeft:8 }} className="badge">{badges.purchases}</span>}
+              </button>
             ))}
             <button className="btn" onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('role'); setAuthed(false) }}>Đăng xuất</button>
           </div>
@@ -136,7 +164,6 @@ export default function App() {
           {tab === 'stats' && <Stats />}
           {tab === 'tradeStats' && <TradeStats />}
           {tab === 'admin' && <Admin />}
-          <ChatBot />
           <ChatBot />
       {accountOpen && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.35)', display:'flex', alignItems:'center', justifyContent:'center' }}>

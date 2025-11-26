@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Chat Widget</title>
+<style>
+body{font-family:system-ui;padding:20px}
+.box{border:1px solid #ddd;border-radius:12px;padding:12px;max-width:640px}
+.list{height:260px;overflow:auto;border:1px solid #eee;border-radius:8px;padding:8px;margin-bottom:8px}
+.msg{padding:6px 8px;border-radius:8px;margin:6px 0}
+.bot{background:#f1f5f9}
+.user{background:#dcfce7;text-align:right}
+.sql{font-family:monospace;font-size:13px;background:#fafafa;border:1px solid #eee;border-radius:8px;padding:8px;white-space:pre-wrap}
+table{border-collapse:collapse;width:100%}
+th,td{border:1px solid #ddd;padding:6px}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="list" id="list"></div>
+  <div>
+    <input id="inp" placeholder="Nhập câu..." style="width:78%;height:36px" />
+    <button id="send" style="height:36px">Gửi</button>
+  </div>
+</div>
+<script>
+const list = document.getElementById('list')
+function add(role, text){ const d=document.createElement('div'); d.className='msg '+role; d.innerHTML=text; list.appendChild(d); list.scrollTop=list.scrollHeight }
+async function call(text){ add('user', text); const r = await fetch('/bot/chat',{ method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ text }) }); const data = await r.json(); add('bot', JSON.stringify({ action:data.action, params:data.params })); if (Array.isArray(data.sql) && data.sql.length) add('bot', '<div class="sql">'+data.sql.join('\n')+'</div>'); if (data.result && data.result.html) add('bot', data.result.html) }
+document.getElementById('send').onclick = () => { const v = document.getElementById('inp').value.trim(); if (!v) return; document.getElementById('inp').value=''; call(v) }
+</script>
+</body>
+</html>

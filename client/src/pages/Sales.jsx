@@ -73,6 +73,7 @@ export default function Sales() {
   const [form, setForm] = useState({
     sale_date: '', ticket_name: '', invoice_no: '', contract: '', created_by: currentUser, issued_by: '', customer_name: '', tea_type: '', price_per_kg: '', weight: '', payment_status: 'pending', export_type: 'domestic', country: ''
   });
+  const [hint, setHint] = useState('')
   const draftKey = `draft:sales:${currentUser}`
 
   const monthOptions = useMemo(() => Array.from({ length: 12 }, (_, i) => i + 1), []);
@@ -322,11 +323,11 @@ export default function Sales() {
 
       <form onSubmit={onSubmit} className="form">
         <label>Ngày bán</label>
-        <input type="date" value={form.sale_date} onChange={(e) => change('sale_date', e.target.value)} />
+        <input type="date" value={form.sale_date} onChange={(e) => change('sale_date', e.target.value)} onFocus={()=> setHint('Chọn ngày ghi nhận đơn bán')} />
         <label>Tên phiếu</label>
-        <input value={form.ticket_name} onChange={(e) => change('ticket_name', e.target.value)} />
+        <input value={form.ticket_name} onChange={(e) => change('ticket_name', e.target.value)} onFocus={()=> setHint('Tên phiếu nội bộ, dùng để đối chiếu')} />
         <label>Số HĐ</label>
-        <input value={form.invoice_no} onChange={(e) => change('invoice_no', e.target.value)} />
+        <input value={form.invoice_no} onChange={(e) => change('invoice_no', e.target.value)} onFocus={()=> setHint('Nhập Số hóa đơn để tìm nhanh ảnh')} />
         <label>Hợp đồng</label>
         <input value={form.contract} onChange={(e) => change('contract', e.target.value)} />
         <label>Người tạo phiếu</label>
@@ -364,11 +365,11 @@ export default function Sales() {
           {COUNTRY_NAMES_VI.map(name => <option key={name} value={name} />)}
         </datalist>
         <label>Loại chè</label>
-      <input value={form.tea_type} onChange={(e) => { const v = e.target.value; setForm(s => ({ ...s, tea_type: v })); const list = (recentSales||[]).filter(r => String(r.tea_type||'')===v); if (list.length) { const avg = Math.round(list.reduce((sum, r) => sum + Number(r.price_per_kg||0), 0) / list.length); setForm(s => ({ ...s, price_per_kg: formatMoneyInput(String(avg)), tea_type: v })) } }} />
+      <input value={form.tea_type} onChange={(e) => { const v = e.target.value; setForm(s => ({ ...s, tea_type: v })); const list = (recentSales||[]).filter(r => String(r.tea_type||'')===v); if (list.length) { const avg = Math.round(list.reduce((sum, r) => sum + Number(r.price_per_kg||0), 0) / list.length); setForm(s => ({ ...s, price_per_kg: formatMoneyInput(String(avg)), tea_type: v })) } }} onFocus={()=> setHint('Ví dụ: Xanh, Đen, Thành phẩm...')} />
         <label>Đơn giá/kg</label>
-        <input value={form.price_per_kg} onChange={(e) => change('price_per_kg', e.target.value)} />
+        <input value={form.price_per_kg} onChange={(e) => change('price_per_kg', e.target.value)} onFocus={()=> setHint('Nhập giá trên mỗi kg, ví dụ 100000')} />
         <label>Khối lượng (kg)</label>
-        <input type="number" min="0.001" step="0.001" value={form.weight} onChange={(e) => change('weight', e.target.value)} />
+        <input type="number" min="0.001" step="0.001" value={form.weight} onChange={(e) => change('weight', e.target.value)} onFocus={()=> setHint('Nhập khối lượng thực tế, ví dụ 20')} />
         <label>Trạng thái thanh toán</label>
         <select value={form.payment_status} onChange={(e) => change('payment_status', e.target.value)}>
           <option value="pending">Chờ</option>
@@ -377,6 +378,7 @@ export default function Sales() {
         <div className="muted">Tổng tạm tính: {totalPreview.toLocaleString()} • Lợi nhuận ước tính: {profitPreview.toLocaleString()}</div>
         {error && <div className="error">{error}</div>}
         <button className="btn primary" type="submit">{editingId ? 'Lưu chỉnh sửa' : 'Thêm đơn bán'}</button>
+        {hint && <div className="muted" style={{ marginTop:8 }}>{hint}</div>}
         {editingId && <button className="btn" type="button" onClick={() => { setEditingId(null); setForm({ sale_date: '', customer_name: '', tea_type: '', price_per_kg: '', weight: '', payment_status: 'pending' }); }}>Hủy</button>}
       </form>
 

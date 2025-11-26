@@ -95,7 +95,7 @@ body{background:var(--bg)}
   .form .btn.primary{width:100%}
   .section-bar{flex-wrap:wrap}
 }
-.device-override{}
+.device-override{display:block}
 [data-device="mobile"] .form{grid-template-columns:1fr}
 [data-device="mobile"] .filters{grid-template-columns:1fr}
 [data-device="mobile"] input,[data-device="mobile"] select{height:48px;font-size:16px}
@@ -115,7 +115,6 @@ body{background:var(--bg)}
 [data-device="mobile"] .hero{display:none}
 [data-device="mobile"] .section-bar.filter-grid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
 [data-device="pc"] .form{grid-template-columns:1fr}
-.root{}
 :root{
   --bg:#ffffff;
   --text:#1f2937;

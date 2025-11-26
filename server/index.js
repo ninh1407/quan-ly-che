@@ -36,6 +36,8 @@ app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 try { if (!fs.existsSync('uploads')) fs.mkdirSync('uploads'); } catch {}
 app.use('/uploads', express.static('uploads'));
 try { if (!fs.existsSync('uploads_enc')) fs.mkdirSync('uploads_enc'); } catch {}
+try { if (!fs.existsSync(path.join(__dirname,'public'))) fs.mkdirSync(path.join(__dirname,'public')); } catch {}
+app.use('/public', express.static(path.join(__dirname,'public')));
 
 let db = null;
 let SQLITE_READY = false;
@@ -655,19 +657,31 @@ async function kpiReply(msg){
 }
 async function findReceipt(msg){
   if (!SQLITE_READY) return { reply: 'DB chưa sẵn sàng', actions: [] }
-  const q = (String(msg||'').match(/h[đd]\s*([\w-]+)/i)?.[1]) || (String(msg||'').match(/(\d{4,})/)?.[1]) || ''
+  const s = String(msg||'')
+  const q = (s.match(/h[đd]\s*([\w-]+)/i)?.[1]) || (s.match(/(\d{4,})/)?.[1]) || ''
+  const wantSales = /\b(thu|bán|sales)\b/i.test(s)
+  const wantPurch = /\b(nhập|purchases)\b/i.test(s)
+  const { m, y } = detectMonthYear(s)
   const whereLike = `%${q}%`
   return new Promise((resolve)=> {
     const out = []
-    db.all(`SELECT id, invoice_no, ticket_name, sale_date AS d FROM sales WHERE (invoice_no LIKE ? OR ticket_name LIKE ?) AND receipt_path IS NOT NULL ORDER BY d DESC LIMIT 5`, [whereLike, whereLike], (e,rows)=>{
-      (rows||[]).forEach(r=> out.push({ type:'sales', id:r.id, invoice_no:r.invoice_no||r.ticket_name||'' }))
-      db.all(`SELECT id, invoice_no, ticket_name, weigh_ticket_code, purchase_date AS d FROM purchases WHERE (invoice_no LIKE ? OR ticket_name LIKE ? OR weigh_ticket_code LIKE ?) AND receipt_path IS NOT NULL ORDER BY d DESC LIMIT 5`, [whereLike, whereLike, whereLike], (e2,rows2)=>{
-        (rows2||[]).forEach(r=> out.push({ type:'purchases', id:r.id, invoice_no:r.invoice_no||r.ticket_name||r.weigh_ticket_code||'' }))
+    const salesSql = `SELECT id, invoice_no, ticket_name, sale_date AS d FROM sales WHERE receipt_path IS NOT NULL ${q? ' AND (invoice_no LIKE ? OR ticket_name LIKE ?)':''} ${m? " AND strftime('%m', sale_date) = ?":''} ${y? " AND strftime('%Y', sale_date) = ?":''} ORDER BY d DESC LIMIT 10`
+    const purchSql = `SELECT id, invoice_no, ticket_name, weigh_ticket_code, purchase_date AS d FROM purchases WHERE receipt_path IS NOT NULL ${q? ' AND (invoice_no LIKE ? OR ticket_name LIKE ? OR weigh_ticket_code LIKE ?)':''} ${m? " AND strftime('%m', purchase_date) = ?":''} ${y? " AND strftime('%Y', purchase_date) = ?":''} ORDER BY d DESC LIMIT 10`
+    const salesParams = []
+    const purchParams = []
+    if (q) { salesParams.push(whereLike, whereLike); purchParams.push(whereLike, whereLike, whereLike) }
+    if (m) { salesParams.push(pad2(m)); purchParams.push(pad2(m)) }
+    if (y) { salesParams.push(String(y)); purchParams.push(String(y)) }
+    const doSales = () => db.all(salesSql, salesParams, (e,rows)=>{ (rows||[]).forEach(r=> out.push({ type:'sales', id:r.id, invoice_no:r.invoice_no||r.ticket_name||'' })); doPurch() })
+    const doPurch = () => db.all(purchSql, purchParams, (e2,rows2)=>{ (rows2||[]).forEach(r=> out.push({ type:'purchases', id:r.id, invoice_no:r.invoice_no||r.ticket_name||r.weigh_ticket_code||'' })); finish() })
+    const finish = () => {
         if (!out.length) return resolve({ reply: 'Không tìm thấy ảnh hóa đơn phù hợp', actions: [] })
         const actions = out.map(x=> ({ type:'open_url', path:`/api/${x.type}/${x.id}/receipt`, label:`Mở ${x.type} • ${x.invoice_no||('#'+x.id)}` }))
-        resolve({ reply: `Tìm thấy ${out.length} ảnh theo "${q}"`, actions })
-      })
-    })
+        resolve({ reply: `Tìm thấy ${out.length} ảnh${q? ' theo "'+q+'"':''}`, actions })
+      }
+    if (wantSales && !wantPurch) { db.all(salesSql, salesParams, (e,rows)=>{ (rows||[]).forEach(r=> out.push({ type:'sales', id:r.id, invoice_no:r.invoice_no||r.ticket_name||'' })); finish() }) }
+    else if (wantPurch && !wantSales) { db.all(purchSql, purchParams, (e,rows)=>{ (rows||[]).forEach(r=> out.push({ type:'purchases', id:r.id, invoice_no:r.invoice_no||r.ticket_name||r.weigh_ticket_code||'' })); finish() }) }
+    else doSales()
   })
 }
 function parseNumber(s){ const m = (String(s).match(/\d+[\.,]?\d*/) || ['0'])[0].replace(',','.'); return Number(m) }
@@ -681,11 +695,23 @@ async function parseCreate(msg){
   const name = (String(msg).match(/cho\s+([^\d]+?)(?:\s+ngày|$)/i)||[])[1]?.trim() || ''
   if (isSale) {
     const payload = { sale_date: dstr, customer_name: name, tea_type:'', price_per_kg: price, weight, payment_status:'pending' }
-    return { reply:`Tạo đơn bán? Ngày ${dstr}, KH: ${name||'-'}, ${weight}kg x ${price}`, actions:[{ type:'prefill_sales', payload, label:'Điền form đơn bán' }, { type:'navigate', tab:'sales', label:'Mở Bán chè' }] }
+    return { reply:`Tạo đơn bán? Ngày ${dstr}, KH: ${name||'-'}, ${weight}kg x ${price}`,
+      actions:[
+        { type:'function_call', name:'create_sale', args: payload, label:'Tạo đơn bán' },
+        { type:'prefill_sales', payload, label:'Điền form đơn bán' },
+        { type:'navigate', tab:'sales', label:'Mở Bán chè' }
+      ]
+    }
   }
   if (isPurch) {
     const payload = { purchase_date: dstr, supplier_name: name, ticket_name:'', weight, unit_price: price, payment_status:'pending' }
-    return { reply:`Tạo đơn nhập? Ngày ${dstr}, NCC: ${name||'-'}, ${weight}kg x ${price}`, actions:[{ type:'prefill_purchases', payload, label:'Điền form đơn nhập' }, { type:'navigate', tab:'purchases', label:'Mở Nhập chè' }] }
+    return { reply:`Tạo đơn nhập? Ngày ${dstr}, NCC: ${name||'-'}, ${weight}kg x ${price}`,
+      actions:[
+        { type:'function_call', name:'create_purchase', args: payload, label:'Tạo đơn nhập' },
+        { type:'prefill_purchases', payload, label:'Điền form đơn nhập' },
+        { type:'navigate', tab:'purchases', label:'Mở Nhập chè' }
+      ]
+    }
   }
   return { reply:'Bạn muốn tạo Đơn bán hay Đơn nhập? Ví dụ: "Thêm đơn bán 20kg giá 100k cho A ngày 25/11"', actions: [] }
 }
@@ -697,7 +723,13 @@ async function parseCreateExpense(msg){
   const now = new Date(); const y = now.getFullYear(); const dstr = dateM ? `${y}-${pad2(Number(dateM[2]))}-${pad2(Number(dateM[1]))}` : `${y}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())}`
   const desc = (String(msg).match(/cho\s+(.+?)(?:\s+ngày|$)/i)||[])[1]?.trim() || (String(msg).match(/chi phí\s+(.+?)\s+(\d+)/i)||[])[1] || ''
   const payload = { expense_date: dstr, description: desc, amount: amount || '', category: 'Biến phí' }
-  return { reply:`Tạo chi phí? Ngày ${dstr}, Mô tả: ${desc||'-'}, Số tiền: ${amount||'-'}`, actions:[{ type:'prefill_expenses', payload, label:'Điền form Chi phí' }, { type:'navigate', tab:'expenses', label:'Mở Chi phí' }] }
+  return { reply:`Tạo chi phí? Ngày ${dstr}, Mô tả: ${desc||'-'}, Số tiền: ${amount||'-'}`,
+    actions:[
+      { type:'function_call', name:'create_expense', args: payload, label:'Tạo chi phí' },
+      { type:'prefill_expenses', payload, label:'Điền form Chi phí' },
+      { type:'navigate', tab:'expenses', label:'Mở Chi phí' }
+    ]
+  }
 }
 async function topReply(msg){
   const { m, y } = detectMonthYear(msg)
@@ -769,11 +801,32 @@ async function simpleBotReplyFull(text){
   if (/(hđ|hóa đơn|receipt|bill|số hđ|tìm ảnh)/.test(low)) return findReceipt(low)
   if (/(thêm|tạo).*(đơn bán|đơn nhập|bán|nhập)/.test(low)) return parseCreate(low)
   if (/(thêm|tạo).*(chi phí)/.test(low)) { const r = await parseCreateExpense(low); if (r) return r }
+  if (/(xóa|xoá).*(đơn bán|bán)\s*#?\d+/.test(low)) { const id = Number((low.match(/#?(\d+)/)||[])[1]||0); if (id>0) return { reply:`Xóa đơn bán #${id}?`, actions:[{ type:'function_call', name:'delete_sale', args:{ id }, label:'Xác nhận' }] } }
+  if (/(xóa|xoá).*(đơn nhập|nhập)\s*#?\d+/.test(low)) { const id = Number((low.match(/#?(\d+)/)||[])[1]||0); if (id>0) return { reply:`Xóa đơn nhập #${id}?`, actions:[{ type:'function_call', name:'delete_purchase', args:{ id }, label:'Xác nhận' }] } }
+  if (/(xóa|xoá).*(chi phí)\s*#?\d+/.test(low)) { const id = Number((low.match(/#?(\d+)/)||[])[1]||0); if (id>0) return { reply:`Xóa chi phí #${id}?`, actions:[{ type:'function_call', name:'delete_expense', args:{ id }, label:'Xác nhận' }] } }
   if (/(bán|đơn bán)/.test(low)) return { reply:'Mở tab Bán chè, điền Ngày/Khách hàng/Giá/kg/Cân nặng và bấm "Thêm đơn bán".', actions:[{ type:'navigate', tab:'sales', label:'Mở Bán chè' }] }
   if (/(nhập|đơn nhập)/.test(low)) return { reply:'Mở tab Nhập chè, điền Ngày/Nhà cung cấp/Giá/kg/Cân nặng và bấm "Thêm đơn nhập".', actions:[{ type:'navigate', tab:'purchases', label:'Mở Nhập chè' }] }
   if (/(chi phí|thêm chi)/.test(low)) return { reply:'Vào tab Chi phí, nhập Ngày/Mô tả/Số tiền/Loại, bấm "Thêm chi phí". Có thể đính kèm ảnh.', actions:[{ type:'navigate', tab:'expenses', label:'Mở Chi phí' }] }
   if (/(ảnh|hóa đơn|bill|receipt)/.test(low)) return { reply:'Mở tab "Ảnh hóa đơn" để xem hoặc tìm theo Số HĐ, tháng/năm.', actions:[{ type:'navigate', tab:'receipts', label:'Mở Ảnh hóa đơn' }] }
+  if (/(tổng kết|cuối ngày|hôm nay)/.test(low)) return dailySummaryReply()
+  if (/(hướng dẫn.*(thêm đơn bán|đơn bán)|thêm đơn bán)/.test(low)) return { reply:'Các bước thêm đơn bán', actions:[{ type:'navigate', tab:'sales', label:'Mở Bán chè' }], cards:[{ title:'Thêm đơn bán', bullets:['Mở tab Bán chè','Điền Ngày bán','Điền Khách hàng','Điền Giá/kg và Cân nặng','Bấm Thêm đơn bán'] }] }
+  if (/(hướng dẫn.*(thêm đơn nhập|đơn nhập)|thêm đơn nhập)/.test(low)) return { reply:'Các bước thêm đơn nhập', actions:[{ type:'navigate', tab:'purchases', label:'Mở Nhập chè' }], cards:[{ title:'Thêm đơn nhập', bullets:['Mở tab Nhập chè','Điền Ngày nhập','Điền Nhà cung cấp','Điền Giá/kg và Cân nặng','Bấm Thêm đơn nhập'] }] }
   return { reply:'Chưa hiểu yêu cầu. Bạn có thể hỏi: "Báo cáo tháng 11", "Tìm HĐ 00123", "Thêm đơn bán 20kg giá 100k".', actions:[] }
+}
+
+async function dailySummaryReply(){
+  if (!SQLITE_READY) return { reply:'DB chưa sẵn sàng', actions:[] }
+  const now = new Date(); const d = `${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())}`
+  const sumSales = await new Promise((resolve)=> db.get(`SELECT SUM(price_per_kg * weight) AS s FROM sales WHERE sale_date = ?`, [d], (e,row)=> resolve(Number(row?.s||0))))
+  const sumPurch = await new Promise((resolve)=> db.get(`SELECT SUM(unit_price * COALESCE(net_weight, weight)) AS s FROM purchases WHERE purchase_date = ?`, [d], (e,row)=> resolve(Number(row?.s||0))))
+  const sumExp = await new Promise((resolve)=> db.get(`SELECT SUM(amount) AS s FROM expenses WHERE expense_date = ?`, [d], (e,row)=> resolve(Number(row?.s||0))))
+  const pendingSales = await new Promise((resolve)=> db.get(`SELECT COUNT(*) AS c FROM sales WHERE payment_status = 'pending'`, [], (e,row)=> resolve(Number(row?.c||0))))
+  const pendingPurch = await new Promise((resolve)=> db.get(`SELECT COUNT(*) AS c FROM purchases WHERE payment_status = 'pending'`, [], (e,row)=> resolve(Number(row?.c||0))))
+  const receiptsTodayS = await new Promise((resolve)=> db.get(`SELECT COUNT(*) AS c FROM sales WHERE sale_date = ? AND receipt_path IS NOT NULL`, [d], (e,row)=> resolve(Number(row?.c||0))))
+  const receiptsTodayP = await new Promise((resolve)=> db.get(`SELECT COUNT(*) AS c FROM purchases WHERE purchase_date = ? AND receipt_path IS NOT NULL`, [d], (e,row)=> resolve(Number(row?.c||0))))
+  const profit = sumSales - sumPurch - sumExp
+  const reply = `Tổng kết hôm nay (${d}) — Thu: ${sumSales.toLocaleString()} • Chi nhập: ${sumPurch.toLocaleString()} • Chi phí: ${sumExp.toLocaleString()} • Lãi/Lỗ: ${profit.toLocaleString()} • Chưa thanh toán: bán ${pendingSales}, nhập ${pendingPurch} • Ảnh mới: ${receiptsTodayS+receiptsTodayP}`
+  return { reply, actions:[{ type:'navigate', tab:'dashboard', label:'Mở Tổng quan' }], cards:[{ title:'Gợi ý', bullets:['Kiểm tra đơn chưa thanh toán','Xem ảnh hóa đơn mới','Cập nhật chi phí phát sinh'] }] }
 }
 
 async function parseMarkPaid(text){
@@ -782,11 +835,11 @@ async function parseMarkPaid(text){
   const purchM = s.match(/(đánh dấu|mark).*(đã thanh toán|paid).*(đơn nhập|nhập)\s*(#?(\d+))/)
   if (saleM) {
     const id = Number(saleM[4])
-    return { reply:`Đánh dấu đã thanh toán đơn bán #${id}?`, actions:[{ type:'post_api', method:'put', path:`/sales/${id}`, payload:{ payment_status:'paid' }, label:'Xác nhận' }] }
+    return { reply:`Đánh dấu đã thanh toán đơn bán #${id}?`, actions:[{ type:'function_call', name:'mark_sale_paid', args:{ id }, label:'Xác nhận' }] }
   }
   if (purchM) {
     const id = Number(purchM[4])
-    return { reply:`Đánh dấu đã thanh toán đơn nhập #${id}?`, actions:[{ type:'post_api', method:'put', path:`/purchases/${id}`, payload:{ payment_status:'paid' }, label:'Xác nhận' }] }
+    return { reply:`Đánh dấu đã thanh toán đơn nhập #${id}?`, actions:[{ type:'function_call', name:'mark_purchase_paid', args:{ id }, label:'Xác nhận' }] }
   }
   return null
 }
@@ -961,6 +1014,39 @@ app.post('/bot', requireAuth, rateLimit(60_000, 30, 'bot'), async (req, res) => 
   } catch (e) {
     res.status(500).json({ message: 'Bot error', detail: String(e?.message||'') })
   }
+})
+try { app.use('/bot', require('./routes/bot')) } catch {}
+
+app.get('/bot/schema', requireAuth, (req, res) => {
+  const schema = {
+    actions: [
+      { type: 'navigate', fields: ['tab'] },
+      { type: 'open_url', fields: ['path'] },
+      { type: 'prefill_sales', fields: ['payload'] },
+      { type: 'prefill_purchases', fields: ['payload'] },
+      { type: 'prefill_expenses', fields: ['payload'] },
+      { type: 'post_api', fields: ['method','path','payload'] },
+      { type: 'function_call', fields: ['name','args'] }
+    ],
+    functions: [
+      { name:'create_sale', args:['sale_date','customer_name','tea_type','price_per_kg','weight','payment_status','ticket_name','invoice_no','contract','issued_by','export_type','country'] },
+      { name:'update_sale', args:['id','sale_date','customer_name','tea_type','price_per_kg','weight','payment_status','ticket_name','invoice_no','contract','created_by','issued_by','export_type','country','receipt_data','receipt_name'] },
+      { name:'delete_sale', args:['id'] },
+      { name:'mark_sale_paid', args:['id','receipt_data','receipt_name'] },
+      { name:'create_purchase', args:['purchase_date','supplier_name','weight','unit_price','payment_status','water_percent','net_weight','ticket_name','invoice_no','weigh_ticket_code','vehicle_plate'] },
+      { name:'update_purchase', args:['id','purchase_date','supplier_name','weight','unit_price','payment_status','water_percent','net_weight','ticket_name','invoice_no','weigh_ticket_code','vehicle_plate','receipt_data','receipt_name'] },
+      { name:'delete_purchase', args:['id'] },
+      { name:'mark_purchase_paid', args:['id','receipt_data','receipt_name'] },
+      { name:'create_expense', args:['expense_date','description','amount','category','receipt_data','receipt_name'] },
+      { name:'update_expense', args:['id','expense_date','description','amount','category','receipt_data','receipt_name'] },
+      { name:'delete_expense', args:['id'] },
+      { name:'find_receipts', args:['q','type','month','year'] },
+      { name:'kpi_month', args:['month','year'] },
+      { name:'top_customers_month', args:['month','year'] },
+      { name:'top_suppliers_month', args:['month','year'] }
+    ]
+  }
+  res.json(schema)
 })
 
 app.put('/sales/:id', rateLimit(60_000, 60, 'sales_put'), requireAuth, (req, res) => {
@@ -3104,3 +3190,35 @@ function simpleBotReply(text) {
   }
   return 'Chưa hiểu yêu cầu. Bạn có thể hỏi: "Hướng dẫn nhập đơn", "Xem ảnh hóa đơn", "Thêm chi phí".'
 }
+async function findByAmount(msg){
+  if (!SQLITE_READY) return { reply:'DB chưa sẵn sàng', actions:[] }
+  const s = String(msg||'')
+  const isSales = /\b(đơn bán|bán|thu)\b/i.test(s)
+  const isPurch = /\b(đơn nhập|nhập)\b/i.test(s)
+  const opM = s.match(/(>|<|>=|<=)\s*(\d+[\.,]?\d*)\s*(triệu|\bt\b|vnd|đ|vnđ)?/i)
+  if (!opM) return { reply:'Câu lệnh số tiền chưa rõ. Ví dụ: "đơn bán > 20 triệu tháng 11"', actions:[] }
+  const op = opM[1]
+  const val = Number(opM[2].replace(',','.')) * (/triệu|\bt\b/i.test(opM[3]||'') ? 1_000_000 : 1)
+  const { m, y } = detectMonthYear(s)
+  const mm = pad2(m); const yy = String(y)
+  const cmp = (op) => (op==='>'?' > ':(op==='>='?' >= ':(op==='<')?' < ': (op==='<=')?' <= ':' > '))
+  const out = []
+  if (isSales) {
+    const sql = `SELECT id, sale_date AS d, customer_name AS name, (price_per_kg * weight) AS v FROM sales WHERE strftime('%m', sale_date)=? AND strftime('%Y', sale_date)=? AND (price_per_kg * weight) ${cmp(op)} ? ORDER BY v DESC LIMIT 10`
+    return new Promise((resolve)=> db.all(sql, [mm, yy, val], (e, rows)=> {
+      (rows||[]).forEach(r => out.push({ type:'sales', id:r.id, label:`${r.name||'-'} ${Number(r.v||0).toLocaleString()}` }))
+      const actions = out.map(x => ({ type:'navigate', tab:'sales', label:`Mở đơn ${x.type} #${x.id} • ${x.label}` }))
+      resolve({ reply:`Có ${out.length} đơn bán thỏa điều kiện`, actions })
+    }))
+  }
+  if (isPurch) {
+    const sql = `SELECT id, purchase_date AS d, supplier_name AS name, (unit_price * COALESCE(net_weight, weight)) AS v FROM purchases WHERE strftime('%m', purchase_date)=? AND strftime('%Y', purchase_date)=? AND (unit_price * COALESCE(net_weight, weight)) ${cmp(op)} ? ORDER BY v DESC LIMIT 10`
+    return new Promise((resolve)=> db.all(sql, [mm, yy, val], (e, rows)=> {
+      (rows||[]).forEach(r => out.push({ type:'purchases', id:r.id, label:`${r.name||'-'} ${Number(r.v||0).toLocaleString()}` }))
+      const actions = out.map(x => ({ type:'navigate', tab:'purchases', label:`Mở đơn ${x.type} #${x.id} • ${x.label}` }))
+      resolve({ reply:`Có ${out.length} đơn nhập thỏa điều kiện`, actions })
+    }))
+  }
+  return { reply:'Cần chỉ rõ Bán hay Nhập. Ví dụ: "đơn bán > 20 triệu tháng 11"', actions:[] }
+}
+  if (/\b(đơn bán|đơn nhập|bán|nhập)\b.*(>|<|>=|<=)/.test(low)) return findByAmount(low)
