@@ -799,6 +799,7 @@ async function simpleBotReplyFull(text){
   if (/(top|xếp hạng).*(năm)/.test(low)) return topYearReply(low)
   if (/(chi phí|breakdown|theo loại)/.test(low)) return expenseBreakdown(low)
   if (/(công nợ|chi tiết công nợ|aging)/.test(low)) return debtsDetail(low)
+  if (/\b(đơn bán|đơn nhập|bán|nhập)\b.*(>|<|>=|<=)/.test(low)) return findByAmount(low)
   if (/(hđ|hóa đơn|receipt|bill|số hđ|tìm ảnh)/.test(low)) return findReceipt(low)
   if (/(thêm|tạo).*(đơn bán|đơn nhập|bán|nhập)/.test(low)) return parseCreate(low)
   if (/(thêm|tạo).*(chi phí)/.test(low)) { const r = await parseCreateExpense(low); if (r) return r }
@@ -3222,4 +3223,3 @@ async function findByAmount(msg){
   }
   return { reply:'Cần chỉ rõ Bán hay Nhập. Ví dụ: "đơn bán > 20 triệu tháng 11"', actions:[] }
 }
-  if (/\b(đơn bán|đơn nhập|bán|nhập)\b.*(>|<|>=|<=)/.test(low)) return findByAmount(low)
