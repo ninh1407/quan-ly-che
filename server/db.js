@@ -1,13 +1,17 @@
 const path = require('path')
-const sqlite3 = require('sqlite3').verbose()
 const fs = require('fs')
+let sqlite3 = null
+let READY = false
+let LOAD_ERR = ''
+try { sqlite3 = require('sqlite3').verbose(); READY = true } catch (e) { LOAD_ERR = String(e.message||''); console.warn('BOT SQLite load error:', LOAD_ERR) }
 const DB_PATH = process.env.BOT_DB_PATH || path.join(__dirname, 'database.sqlite')
 try { const dir = path.dirname(DB_PATH); if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true }) } catch {}
-const db = new sqlite3.Database(DB_PATH)
-function run(sql, params=[]) { return new Promise((resolve, reject) => db.run(sql, params, function(e){ if (e) return reject(e); resolve({ lastID: this.lastID, changes: this.changes }) })) }
-function get(sql, params=[]) { return new Promise((resolve, reject) => db.get(sql, params, (e,row)=> e?reject(e):resolve(row))) }
-function all(sql, params=[]) { return new Promise((resolve, reject) => db.all(sql, params, (e,rows)=> e?reject(e):resolve(rows))) }
+const db = READY ? new sqlite3.Database(DB_PATH) : null
+function run(sql, params=[]) { if (!READY) return Promise.reject(new Error('SQLite not available: '+LOAD_ERR)); return new Promise((resolve, reject) => db.run(sql, params, function(e){ if (e) return reject(e); resolve({ lastID: this.lastID, changes: this.changes }) })) }
+function get(sql, params=[]) { if (!READY) return Promise.reject(new Error('SQLite not available: '+LOAD_ERR)); return new Promise((resolve, reject) => db.get(sql, params, (e,row)=> e?reject(e):resolve(row))) }
+function all(sql, params=[]) { if (!READY) return Promise.reject(new Error('SQLite not available: '+LOAD_ERR)); return new Promise((resolve, reject) => db.all(sql, params, (e,rows)=> e?reject(e):resolve(rows))) }
 function init() {
+  if (!READY) return
   db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS tea_types (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, base_price REAL, season TEXT)`)
     db.run(`CREATE TABLE IF NOT EXISTS suppliers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, phone TEXT, address TEXT)`)
