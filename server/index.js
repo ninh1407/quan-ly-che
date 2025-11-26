@@ -959,7 +959,7 @@ app.post('/bot', requireAuth, rateLimit(60_000, 30, 'bot'), async (req, res) => 
     const r = await simpleBotReplyFull(message)
     res.json(r)
   } catch (e) {
-    res.status(500).json({ message: 'Bot error' })
+    res.status(500).json({ message: 'Bot error', detail: String(e?.message||'') })
   }
 })
 
