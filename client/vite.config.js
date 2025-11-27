@@ -1,11 +1,7 @@
 import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react-swc'
 
 export default defineConfig({
-  server: { port: 8080, host: true },
-  esbuild: {
-    jsx: 'classic',
-    jsxFactory: 'React.createElement',
-    jsxFragment: 'React.Fragment',
-    jsxInject: `import * as React from 'react'`
-  }
+  plugins: [react()],
+  server: { port: 8080, host: true }
 })
