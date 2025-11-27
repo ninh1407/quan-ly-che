@@ -56,6 +56,10 @@ export default function FinishedStock() {
     try { await api.delete(`/finished-stock/${id}`); load() } catch (e) { alert(e?.response?.data?.message || 'Xóa lỗi') }
   }
 
+  const totalPreview = (() => {
+    const w = Number(form.weight||0); const c = Number(form.unit_cost||0); return w*c || 0
+  })()
+
   return (
     <div className="card">
       <h2>Nhập kho thành phẩm</h2>
@@ -82,34 +86,49 @@ export default function FinishedStock() {
         {error && <div className="error">{error}</div>}
       </div>
 
-      <div className="card" style={{ marginTop: 12 }}>
-        <div style={{ fontWeight:700, marginBottom:6 }}>Thêm bản ghi</div>
-        <div className="form">
-          <div>
-            <label>Ngày nhập</label>
-            <input type="date" value={form.entry_date} onChange={(e)=> setForm({ ...form, entry_date: e.target.value })} />
-          </div>
-          <div>
-            <label>Loại chè</label>
-            <input value={form.tea_type} onChange={(e)=> setForm({ ...form, tea_type: e.target.value })} placeholder="vd: Ô long" />
-          </div>
-          <div>
-            <label>Khối lượng (kg)</label>
-            <input type="number" value={form.weight} onChange={(e)=> setForm({ ...form, weight: e.target.value })} />
-          </div>
-          <div>
-            <label>Giá vốn (đ/kg)</label>
-            <input type="number" value={form.unit_cost} onChange={(e)=> setForm({ ...form, unit_cost: e.target.value })} />
-          </div>
-          <div>
-            <label>Ghi chú</label>
-            <input value={form.note} onChange={(e)=> setForm({ ...form, note: e.target.value })} />
-          </div>
-          <div>
-            <button className="btn primary" type="button" onClick={submit}>Thêm</button>
+      <form onSubmit={(e)=> { e.preventDefault(); submit() }} className="form-grid" style={{ marginTop:12 }}>
+        <div className="form-card">
+          <div className="card-title">Thông tin nhập</div>
+          <div className="group">
+            <div>
+              <label>Ngày nhập</label>
+              <input type="date" value={form.entry_date} onChange={(e)=> setForm({ ...form, entry_date: e.target.value })} />
+            </div>
+            <div>
+              <label>Loại chè</label>
+              <input placeholder="vd: Ô long" value={form.tea_type} onChange={(e)=> setForm({ ...form, tea_type: e.target.value })} />
+            </div>
           </div>
         </div>
-      </div>
+        <div className="form-card">
+          <div className="card-title">Khối lượng & Giá vốn</div>
+          <div className="group">
+            <div>
+              <label>Khối lượng (kg)</label>
+              <input type="number" min="0" step="0.001" value={form.weight} onChange={(e)=> setForm({ ...form, weight: e.target.value })} />
+            </div>
+            <div>
+              <label>Giá vốn (đ/kg)</label>
+              <input type="number" min="0" step="1" value={form.unit_cost} onChange={(e)=> setForm({ ...form, unit_cost: e.target.value })} />
+            </div>
+            <div>
+              <div className="total-money">💰 Tổng vốn dự tính: {fmtMoney(totalPreview)} đ</div>
+            </div>
+          </div>
+        </div>
+        <div className="form-card">
+          <div className="card-title">Ghi chú & Lưu</div>
+          <div className="group">
+            <div>
+              <label>Ghi chú</label>
+              <input value={form.note} onChange={(e)=> setForm({ ...form, note: e.target.value })} />
+            </div>
+            <div>
+              <button className="submit" type="submit">Thêm</button>
+            </div>
+          </div>
+        </div>
+      </form>
 
       <div className="table-wrap" style={{ marginTop:12 }}>
         {loading ? 'Đang tải...' : (
