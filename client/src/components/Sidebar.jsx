@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import * as React from 'react'
+const { useState } = React
 
 export default function Sidebar({ tab, setTab }) {
   const [collapsed, setCollapsed] = useState(false)
@@ -26,4 +27,3 @@ export default function Sidebar({ tab, setTab }) {
     </aside>
   )
 }
-

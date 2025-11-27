@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react'
+import * as React from 'react'
+const { useState, useEffect, useMemo, useRef } = React
 import Sales from './pages/Sales.jsx'
 import Purchases from './pages/Purchases.jsx'
 import Expenses from './pages/Expenses.jsx'
@@ -324,4 +325,3 @@ export default function App() {
       document.removeEventListener('touchstart', closeOutside, true)
     }
   }, [])
-

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react'
+import * as React from 'react'
+const { useState, useEffect } = React
 import api from '../api.js'
 
 export default function Login({ onSuccess, onLogout }) {

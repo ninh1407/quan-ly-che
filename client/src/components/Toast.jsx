@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react'
+import * as React from 'react'
+const { useEffect, useMemo, useState, useRef } = React
 
 let emit
 export function toast(message, type='info') { if (emit) emit({ message, type }) }
@@ -18,4 +19,3 @@ export default function ToastContainer() {
     </div>
   )
 }
-

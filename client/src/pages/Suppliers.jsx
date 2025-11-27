@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react'
+import * as React from 'react'
+const { useEffect, useMemo, useState, useRef } = React
 import api from '../api.js'
 
 export default function Suppliers() {
@@ -8,7 +9,7 @@ export default function Suppliers() {
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState({ name: '', phone: '', address: '', note: '' })
   const [query, setQuery] = useState('')
-  const rolesRaw = (() => { try { const r = JSON.parse(localStorage.getItem('roles')||'null'); if (Array.isArray(r)) return r; } catch {} const s = (localStorage.getItem('role')||'user'); return String(s).split(',').map(x=>x.trim()) })()
+  const rolesRaw = (() => { try { const r = JSON.parse(localStorage.getItem('roles')||'null'); if (Array.isArray(r)) return r; } catch {} const s = (localStorage.getItem('role')||'user'); return String(s).split(',').map(x=>x.trim()).filter(Boolean) })()
   const hasRole = (name) => rolesRaw.includes(name)
 
   const load = async () => {
