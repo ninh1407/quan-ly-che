@@ -142,9 +142,7 @@ export default function App() {
       <Breadcrumb tab={tab} />
       <div className="tabs">
           <button className="btn" onClick={() => setMenuOpen(true)}>☰ Menu</button>
-          <button className="btn desktop-only" onClick={() => setSettingsOpen(true)}>⚙️ Cài đặt</button>
           <button className="btn" onClick={() => setTheme(theme === 'light' ? 'dark' : (theme==='dark' ? 'tea' : (theme==='tea' ? 'wood' : 'light')))}>{theme === 'light' ? '🌙 Tối' : (theme==='dark' ? '🍵 Nâu – Xanh lá' : (theme==='tea' ? '🪵 Gỗ truyền thống' : '☀️ Sáng'))}</button>
-          <button className="btn" onClick={() => setSettingsOpen(true)}>⚙️ Cài đặt</button>
           <details className="dropdown" style={{ marginLeft: 'auto' }}>
             <summary className="btn avatar"><span className="circle">{(localStorage.getItem('username')||'N')[0].toUpperCase()}</span> {(localStorage.getItem('username')||'Người dùng')} ▾</summary>
           <div className="dropdown-menu">
