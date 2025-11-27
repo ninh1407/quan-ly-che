@@ -4,6 +4,8 @@
 .mobile-toolbar{display:none}
 .nav-buttons{display:flex;gap:10px;flex-wrap:wrap}
 .hamburger-btn{padding:10px 12px;border:1px solid var(--border);background:var(--accent);border-radius:10px}
+.hamburger-btn{display:inline-block}
+.hamburger-btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
 .drawer{position:fixed;inset:0;display:none;background:rgba(0,0,0,.35);backdrop-filter:blur(2px);z-index:2000}
 .drawer.open{display:block}
 .drawer-panel{position:absolute;top:0;left:0;width:280px;height:100%;background:var(--surface);border-right:1px solid var(--border);box-shadow:0 8px 24px var(--shadow);padding:16px;display:flex;flex-direction:column;gap:10px;z-index:2001}
