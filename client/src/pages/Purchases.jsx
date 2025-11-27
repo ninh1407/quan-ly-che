@@ -296,46 +296,92 @@ export default function Purchases() {
         </div>
       )}
 
-      <form onSubmit={onSubmit} className="form">
-        <label>Ngày mua</label>
-        <input type="date" value={form.purchase_date} onChange={(e) => change('purchase_date', e.target.value)} onFocus={()=> setHint('Chọn ngày ghi nhận đơn nhập')} />
-        <label>Tên Phiếu</label>
-        <input value={form.ticket_name} onChange={(e) => change('ticket_name', e.target.value)} onFocus={()=> setHint('Tên phiếu nội bộ, dùng để đối chiếu')} />
-        <label>Số HĐ</label>
-        <input value={form.invoice_no} onChange={(e) => change('invoice_no', e.target.value)} onFocus={()=> setHint('Nhập Số hóa đơn để tìm nhanh ảnh')} />
-        <label>Mã phiếu cân</label>
-        <input value={form.weigh_ticket_code} onChange={(e) => change('weigh_ticket_code', e.target.value)} onFocus={()=> setHint('Mã phiếu cân nếu có, phục vụ đối chiếu')} />
-        <label>Biển số xe cân</label>
-        <input value={form.vehicle_plate} onChange={(e) => change('vehicle_plate', e.target.value)} onFocus={()=> setHint('Biển số xe chở hàng')} />
-        <label>Nhà cung cấp</label>
-        <input list="suppliersList" value={form.supplier_name} onChange={(e) => { const name = e.target.value; setForm(s=> ({ ...s, supplier_name: name })); const list = (recentPurchases||[]).filter(r => String(r.supplier_name||'')===name); if (list.length) { const avg = Math.round(list.reduce((sum, r) => sum + Number(r.unit_price||0), 0) / list.length); setForm(s => ({ ...s, unit_price: formatMoneyInput(String(avg)) })) } }} onFocus={()=> setHint('Tên nhà cung cấp')} />
-        <datalist id="suppliersList">
-          {suppliers.map(s => <option key={s.id} value={s.name} />)}
-        </datalist>
-        <label>Khối lượng (kg)</label>
-        <input type="number" min="0.001" step="0.001" value={form.weight} onChange={(e) => change('weight', e.target.value)} onFocus={()=> setHint('Khối lượng trước khi trừ nước')} />
-        <label>% Nước</label>
-        <input type="number" min="0" max="100" step="0.1" value={form.water_percent} onChange={(e) => change('water_percent', e.target.value)} onFocus={()=> setHint('Phần trăm nước để tính khối lượng thực')} />
-        <label>Cân sau trừ hao</label>
-        <input type="number" value={netWeightPreview} readOnly />
-        <div className="muted">Chênh lệch cân: {(Number(form.weight||0) - Number(netWeightPreview||0)).toLocaleString()} kg</div>
-        <label>Đơn giá/kg</label>
-        <input value={form.unit_price} onChange={(e) => {
+      <form onSubmit={onSubmit} className="form-grid">
+        <div className="form-card">
+          <div className="card-title">Thông tin phiếu nhập</div>
+          <div className="group">
+            <div>
+              <label>Ngày mua</label>
+              <input type="date" value={form.purchase_date} onChange={(e) => change('purchase_date', e.target.value)} />
+            </div>
+            <div>
+              <label>Tên Phiếu</label>
+              <input placeholder="VD: PN-11" value={form.ticket_name} onChange={(e) => change('ticket_name', e.target.value)} />
+            </div>
+            <div>
+              <label>Số HĐ</label>
+              <input placeholder="VD: 00123" value={form.invoice_no} onChange={(e) => change('invoice_no', e.target.value)} />
+            </div>
+            <div>
+              <label>Mã phiếu cân</label>
+              <input value={form.weigh_ticket_code} onChange={(e) => change('weigh_ticket_code', e.target.value)} />
+            </div>
+            <div>
+              <label>Biển số xe cân</label>
+              <input value={form.vehicle_plate} onChange={(e) => change('vehicle_plate', e.target.value)} />
+            </div>
+          </div>
+        </div>
+        <div className="form-card">
+          <div className="card-title">Thông số – Sản lượng</div>
+          <div className="group">
+            <div>
+              <label>Nhà cung cấp</label>
+              <input list="suppliersList" placeholder="VD: A Hưng" value={form.supplier_name} onChange={(e) => { const name = e.target.value; setForm(s=> ({ ...s, supplier_name: name })); const list = (recentPurchases||[]).filter(r => String(r.supplier_name||'')===name); if (list.length) { const avg = Math.round(list.reduce((sum, r) => sum + Number(r.unit_price||0), 0) / list.length); setForm(s => ({ ...s, unit_price: formatMoneyInput(String(avg)) })) } }} />
+              <datalist id="suppliersList">
+                {suppliers.map(s => <option key={s.id} value={s.name} />)}
+              </datalist>
+            </div>
+          </div>
+        </div>
+        
+        <div className="form-card">
+          <div className="card-title">Giá & Thanh toán</div>
+          <div className="group">
+            <div>
+              <label>Khối lượng (kg)</label>
+              <input className="highlight" type="number" min="0.001" step="0.001" value={form.weight} onChange={(e) => change('weight', e.target.value)} />
+            </div>
+            <div>
+              <label>% Nước</label>
+              <input type="number" min="0" max="100" step="0.1" value={form.water_percent} onChange={(e) => change('water_percent', e.target.value)} />
+            </div>
+            <div>
+              <label>Cân sau trừ hao</label>
+              <input type="number" value={netWeightPreview} readOnly />
+            </div>
+            <div>
+              <div className="muted">Chênh lệch cân: {(Number(form.weight||0) - Number(netWeightPreview||0)).toLocaleString()} kg</div>
+            </div>
+          </div>
+        </div>
+        <div className="form-card">
+          <div className="group">
+            <div>
+              <label>Đơn giá/kg</label>
+              <input className="highlight" value={form.unit_price} onChange={(e) => {
           const v = e.target.value; const val = parseMoneyInput(v); setForm(s => ({ ...s, unit_price: formatMoneyInput(v) }));
           const refDate = form.purchase_date ? new Date(form.purchase_date) : new Date(); const since = new Date(refDate.getTime() - 7*24*3600*1000)
           const items = (recentPurchases||[]).filter(r => { const d = new Date(r.purchase_date); return d >= since && d <= refDate })
           let sum=0, cnt=0; items.forEach(r => { sum += Number(r.unit_price||0); cnt++ }); const avg = cnt>0 ? (sum/cnt) : 0
-          if (avg>0 && val > avg*1.15) setError(`Giá mua cao hơn trung bình 7 ngày gần nhất (${Math.round(avg).toLocaleString()} đ/kg)`)
-        }} onFocus={()=> setHint('Giá trên mỗi kg thực')} />
-        <label>Trạng thái thanh toán</label>
-        <select value={form.payment_status} onChange={(e) => change('payment_status', e.target.value)}>
-          <option value="pending">Chờ</option>
-          <option value="paid">Đã thanh toán</option>
-        </select>
-        <div className="muted">Tổng tạm tính: {totalPreview.toLocaleString()}</div>
-        {error && <div className="error">{error}</div>}
-        <button className="btn primary" type="submit">{editingId ? 'Lưu chỉnh sửa' : 'Thêm giao dịch nhập'}</button>
-        <div className="card" style={{ marginTop:8, padding:8 }} onDragOver={(e)=> e.preventDefault()} onDrop={async (e)=>{
+          if (avg>0 && val > avg*1.15) setError(`Giá mua cao hơn trung bình 7 ngày gần nhất (${Math.round(avg).toLocaleString()} đ/kg)`) 
+        }} />
+            </div>
+            <div>
+              <label>Trạng thái thanh toán</label>
+              <select value={form.payment_status} onChange={(e) => change('payment_status', e.target.value)}>
+                <option value="pending">Chờ</option>
+                <option value="paid">Đã thanh toán</option>
+              </select>
+            </div>
+            <div>
+              <div className="total-money">💰 Thành tiền dự tính: {totalPreview.toLocaleString()} đ</div>
+              {error && <div className="error">{error}</div>}
+              <button className="submit" type="submit">{editingId ? 'Lưu chỉnh sửa' : 'Thêm giao dịch nhập'}</button>
+            </div>
+          </div>
+        </div>
+        <div className="card" style={{ marginTop:8, padding:12 }} onDragOver={(e)=> e.preventDefault()} onDrop={async (e)=>{
           e.preventDefault(); const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(!f){return}
           if(!selected.length){ setError('Hãy chọn một dòng để đính kèm ảnh rồi thả ảnh vào'); return }
           const id=selected[0]; if(f.size>5*1024*1024){ setError('Ảnh phải nhỏ hơn 5MB'); return }
@@ -346,7 +392,7 @@ export default function Purchases() {
         }}>
           Kéo thả ảnh vào đây để đính kèm cho dòng đã chọn
         </div>
-        {hint && <div className="muted" style={{ marginTop:8 }}>{hint}</div>}
+        {hint && <div className="muted" style={{ gridColumn:'1/-1', marginTop:8 }}>{hint}</div>}
         {editingId && <button className="btn" type="button" onClick={() => { setEditingId(null); setForm({ purchase_date: '', supplier_name: '', ticket_name: '', weigh_ticket_code: '', vehicle_plate: '', weight: '', water_percent: '', unit_price: '', payment_status: 'pending' }); }}>Hủy</button>}
       </form>
 

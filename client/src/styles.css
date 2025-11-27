@@ -26,6 +26,20 @@
 .chart-card{height:260px;overflow:hidden;position:relative}
 .filters{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:6px;align-items:center}
 .form{display:grid;grid-template-columns:1fr;gap:6px;align-items:center}
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:992px){.form-grid{grid-template-columns:1fr}}
+.form-card{background:#fff;padding:24px;border-radius:14px;box-shadow:0 3px 18px rgba(0,0,0,0.08);border:1px solid #e8e3d5}
+.form-card .group{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:992px){.form-card .group{grid-template-columns:1fr}}
+.form-card label{font-weight:600;color:#6b5023;margin-bottom:4px}
+input:hover,select:hover{border-color:#c19a53}
+.highlight{border-color:#c19a53}
+.card{background:#ffffff;border-radius:14px;padding:22px;margin-bottom:18px;border:1px solid #e8dac2;box-shadow:0 3px 10px rgba(0,0,0,0.06)}
+.card-title{font-weight:700;color:#6b4e2e;margin-bottom:10px;font-size:17px}
+input,select{height:42px;border-radius:10px;padding:8px 12px}
+.submit{width:100%;background:linear-gradient(to right,#8a5a2f,#c69c6d);color:#fff;border-radius:10px;font-weight:600;height:48px;transition:.2s}
+.submit:hover{opacity:.85;transform:translateY(-2px)}
+.total-money{font-size:18px;color:#166534;font-weight:700}
 .form label{font-weight:700}
 .filters label{font-weight:700}
 input,select{height:46px;border:1px solid #dfe3ea;border-radius:10px;padding:0 12px;background:#fff;color:var(--text);font-size:16px}

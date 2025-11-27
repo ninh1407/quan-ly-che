@@ -330,63 +330,110 @@ export default function Sales() {
         <button className="btn" style={{ marginLeft: 8 }} onClick={exportPdf} type="button">Xuất PDF</button>
       </div>
 
-      <form onSubmit={onSubmit} className="form">
-        <label>Ngày bán</label>
-        <input type="date" value={form.sale_date} onChange={(e) => change('sale_date', e.target.value)} onFocus={()=> setHint('Chọn ngày ghi nhận đơn bán')} />
-        <label>Tên phiếu</label>
-        <input value={form.ticket_name} onChange={(e) => change('ticket_name', e.target.value)} onFocus={()=> setHint('Tên phiếu nội bộ, dùng để đối chiếu')} />
-        <label>Số HĐ</label>
-        <input value={form.invoice_no} onChange={(e) => change('invoice_no', e.target.value)} onFocus={()=> setHint('Nhập Số hóa đơn để tìm nhanh ảnh')} />
-        <label>Hợp đồng</label>
-        <input value={form.contract} onChange={(e) => change('contract', e.target.value)} />
-        <label>Người tạo phiếu</label>
-        <input list="staffCreators" value={form.created_by} onChange={(e) => change('created_by', e.target.value)} readOnly={!hasRole('admin')} />
-        <datalist id="staffCreators">
-          {staff.filter(x => !x.role || x.role === 'creator').map(x => <option key={`c${x.id}`} value={x.name} />)}
-        </datalist>
-        <label>Người xuất chè</label>
-        <input list="staffSellers" value={form.issued_by} onChange={(e) => change('issued_by', e.target.value)} />
-        <datalist id="staffSellers">
-          {staff.filter(x => !x.role || x.role === 'seller').map(x => <option key={`s${x.id}`} value={x.name} />)}
-        </datalist>
-      <label>Khách hàng</label>
-      <input list="customersList" value={form.customer_name} onChange={(e) => {
-        const name = e.target.value
-        const found = customers.find(c => c.name === name)
-        setForm(s => ({ ...s, customer_name: name, export_type: found?.export_type || s.export_type, country: found?.country || s.country }))
-        const list = (recentSales||[]).filter(r => String(r.customer_name||'')===name || String(r.tea_type||'')===String(form.tea_type||''))
-        if (list.length) {
-          const avg = Math.round(list.reduce((sum, r) => sum + Number(r.price_per_kg||0), 0) / list.length)
-          setForm(s => ({ ...s, price_per_kg: formatMoneyInput(String(avg)) }))
-        }
-      }} />
-        <datalist id="customersList">
-          {customers.map(c => <option key={c.id} value={c.name} />)}
-        </datalist>
-        <label>Xuất</label>
-        <select value={form.export_type} onChange={(e) => change('export_type', e.target.value)}>
-          <option value="domestic">Trong nước</option>
-          <option value="international">Ngoài nước</option>
-        </select>
-        <label>Quốc gia</label>
-        <input list="countriesList" value={form.country} onChange={(e) => change('country', e.target.value)} />
-        <datalist id="countriesList">
-          {COUNTRY_NAMES_VI.map(name => <option key={name} value={name} />)}
-        </datalist>
-        <label>Loại chè</label>
-      <input value={form.tea_type} onChange={(e) => { const v = e.target.value; setForm(s => ({ ...s, tea_type: v })); const list = (recentSales||[]).filter(r => String(r.tea_type||'')===v); if (list.length) { const avg = Math.round(list.reduce((sum, r) => sum + Number(r.price_per_kg||0), 0) / list.length); setForm(s => ({ ...s, price_per_kg: formatMoneyInput(String(avg)), tea_type: v })) } }} onFocus={()=> setHint('Ví dụ: Xanh, Đen, Thành phẩm...')} />
-        <label>Đơn giá/kg</label>
-        <input value={form.price_per_kg} onChange={(e) => change('price_per_kg', e.target.value)} onFocus={()=> setHint('Nhập giá trên mỗi kg, ví dụ 100000')} />
-        <label>Khối lượng (kg)</label>
-        <input type="number" min="0.001" step="0.001" value={form.weight} onChange={(e) => change('weight', e.target.value)} onFocus={()=> setHint('Nhập khối lượng thực tế, ví dụ 20')} />
-        <label>Trạng thái thanh toán</label>
-        <select value={form.payment_status} onChange={(e) => change('payment_status', e.target.value)}>
-          <option value="pending">Chờ</option>
-          <option value="paid">Đã thanh toán</option>
-        </select>
-        <div className="muted">Tổng tạm tính: {totalPreview.toLocaleString()} • Lợi nhuận ước tính: {profitPreview.toLocaleString()}</div>
-        {error && <div className="error">{error}</div>}
-        <button className="btn primary" type="submit">{editingId ? 'Lưu chỉnh sửa' : 'Thêm đơn bán'}</button>
+      <form onSubmit={onSubmit} className="form-grid">
+        <div className="form-card">
+          <div className="group">
+            <div>
+              <label>Ngày bán</label>
+              <input type="date" value={form.sale_date} onChange={(e) => change('sale_date', e.target.value)} />
+            </div>
+            <div>
+              <label>Tên phiếu</label>
+              <input placeholder="VD: PX-11" value={form.ticket_name} onChange={(e) => change('ticket_name', e.target.value)} />
+            </div>
+            <div>
+              <label>Số HĐ</label>
+              <input placeholder="VD: 00123" value={form.invoice_no} onChange={(e) => change('invoice_no', e.target.value)} />
+            </div>
+            <div>
+              <label>Hợp đồng</label>
+              <input value={form.contract} onChange={(e) => change('contract', e.target.value)} />
+            </div>
+          </div>
+        </div>
+        <div className="form-card">
+          <div className="group">
+            <div>
+              <label>Người tạo phiếu</label>
+              <input list="staffCreators" value={form.created_by} onChange={(e) => change('created_by', e.target.value)} readOnly={!hasRole('admin')} />
+              <datalist id="staffCreators">
+                {staff.filter(x => !x.role || x.role === 'creator').map(x => <option key={`c${x.id}`} value={x.name} />)}
+              </datalist>
+            </div>
+            <div>
+              <label>Người xuất chè</label>
+              <input list="staffSellers" value={form.issued_by} onChange={(e) => change('issued_by', e.target.value)} />
+              <datalist id="staffSellers">
+                {staff.filter(x => !x.role || x.role === 'seller').map(x => <option key={`s${x.id}`} value={x.name} />)}
+              </datalist>
+            </div>
+          </div>
+        </div>
+        <div className="form-card">
+          <div className="group">
+            <div>
+              <label>Khách hàng</label>
+              <input list="customersList" placeholder="VD: Hồng trà Thái Nguyên" value={form.customer_name} onChange={(e) => {
+                const name = e.target.value
+                const found = customers.find(c => c.name === name)
+                setForm(s => ({ ...s, customer_name: name, export_type: found?.export_type || s.export_type, country: found?.country || s.country }))
+                const list = (recentSales||[]).filter(r => String(r.customer_name||'')===name || String(r.tea_type||'')===String(form.tea_type||''))
+                if (list.length) { const avg = Math.round(list.reduce((sum, r) => sum + Number(r.price_per_kg||0), 0) / list.length); setForm(s => ({ ...s, price_per_kg: formatMoneyInput(String(avg)) })) }
+              }} />
+              <datalist id="customersList">
+                {customers.map(c => <option key={c.id} value={c.name} />)}
+              </datalist>
+            </div>
+            <div>
+              <label>Xuất</label>
+              <select value={form.export_type} onChange={(e) => change('export_type', e.target.value)}>
+                <option value="domestic">Trong nước</option>
+                <option value="international">Ngoài nước</option>
+              </select>
+            </div>
+            <div>
+              <label>Quốc gia</label>
+              <input list="countriesList" value={form.country} onChange={(e) => change('country', e.target.value)} />
+              <datalist id="countriesList">
+                {COUNTRY_NAMES_VI.map(name => <option key={name} value={name} />)}
+              </datalist>
+            </div>
+          </div>
+        </div>
+        <div className="form-card">
+          <div className="group">
+            <div>
+              <label>Loại chè</label>
+              <input className="highlight" value={form.tea_type} onChange={(e) => { const v = e.target.value; setForm(s => ({ ...s, tea_type: v })); const list = (recentSales||[]).filter(r => String(r.tea_type||'')===v); if (list.length) { const avg = Math.round(list.reduce((sum, r) => sum + Number(r.price_per_kg||0), 0) / list.length); setForm(s => ({ ...s, price_per_kg: formatMoneyInput(String(avg)), tea_type: v })) } }} />
+            </div>
+            <div>
+              <label>Đơn giá/kg</label>
+              <input className="highlight" value={form.price_per_kg} onChange={(e) => change('price_per_kg', e.target.value)} />
+            </div>
+            <div>
+              <label>Khối lượng (kg)</label>
+              <input className="highlight" type="number" min="0.001" step="0.001" value={form.weight} onChange={(e) => change('weight', e.target.value)} />
+            </div>
+            <div>
+              <div className="muted">Tổng tạm tính: {totalPreview.toLocaleString()} • Lợi nhuận ước tính: {profitPreview.toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
+        <div className="form-card">
+          <div className="group">
+            <div>
+              <label>Trạng thái thanh toán</label>
+              <select value={form.payment_status} onChange={(e) => change('payment_status', e.target.value)}>
+                <option value="pending">Chờ</option>
+                <option value="paid">Đã thanh toán</option>
+              </select>
+            </div>
+            <div>
+              {error && <div className="error">{error}</div>}
+              <button className="btn primary" type="submit">{editingId ? 'Lưu chỉnh sửa' : 'Thêm đơn bán'}</button>
+            </div>
+          </div>
+        </div>
         <div className="card" style={{ marginTop:8, padding:8 }} onDragOver={(e)=> e.preventDefault()} onDrop={(e)=>{
           e.preventDefault(); const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(!f){return}
           if(!selected.length){ setError('Hãy chọn một dòng để đính kèm ảnh rồi thả ảnh vào'); return }
@@ -395,7 +442,7 @@ export default function Sales() {
         }}>
           Kéo thả ảnh vào đây để đính kèm cho dòng đã chọn
         </div>
-        {hint && <div className="muted" style={{ marginTop:8 }}>{hint}</div>}
+        {hint && <div className="muted" style={{ gridColumn:'1/-1', marginTop:8 }}>{hint}</div>}
         {editingId && <button className="btn" type="button" onClick={() => { setEditingId(null); setForm({ sale_date: '', customer_name: '', tea_type: '', price_per_kg: '', weight: '', payment_status: 'pending' }); }}>Hủy</button>}
       </form>
 
