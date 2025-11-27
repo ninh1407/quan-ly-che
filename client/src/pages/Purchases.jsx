@@ -41,9 +41,10 @@ export default function Purchases() {
   const [range, setRange] = useState({ from: '', to: '' });
   const [page, setPage] = useState(1); const pageSize = 10;
   const [sort, setSort] = useState({ key: 'purchase_date', asc: true });
-  const origin = (typeof window !== 'undefined') ? window.location.origin : '';
-  const token = (typeof window !== 'undefined') ? (localStorage.getItem('token')||'') : '';
+  const origin = (typeof window !== 'undefined') ? window.location.origin : ''
+  const token = (typeof window !== 'undefined') ? (localStorage.getItem('token')||'') : ''
   const receiptEndpoint = (type, id) => `${origin}/api/${type}/${id}/receipt?t=${encodeURIComponent(token)}`
+  const [viewer, setViewer] = useState({ open:false, url:'', scale:1, img:true })
   const STATUS_LABELS = { pending: 'Chờ', paid: 'Đã thanh toán' }
   const [form, setForm] = useState({
     purchase_date: '', supplier_name: '', ticket_name: '', invoice_no: '', weigh_ticket_code: '', vehicle_plate: '', weight: '', water_percent: '', unit_price: '', payment_status: 'pending'
@@ -457,7 +458,12 @@ export default function Purchases() {
                   <td className="num">{fmtMoney(r.unit_price)}</td>
                   <td className="num">{fmtMoney(r.total_cost)}</td>
                   <td><span className={`pill ${r.payment_status}`}>{STATUS_LABELS[r.payment_status] || r.payment_status}</span></td>
-                  <td>{r.receipt_path ? (<a href={receiptEndpoint('purchases', r.id)} target="_blank" rel="noreferrer">Xem</a>) : (<span className="muted">Chưa có tệp</span>)}</td>
+                  <td>{r.receipt_path ? (
+                    <div style={{ display:'flex', gap:6 }}>
+                      <button className="btn" onClick={()=> setViewer({ open:true, url: receiptEndpoint('purchases', r.id), scale:1, img:true })}>Thu phóng</button>
+                      <a href={receiptEndpoint('purchases', r.id)} target="_blank" rel="noreferrer">Mở tab</a>
+                    </div>
+                  ) : (<span className="muted">Chưa có tệp</span>)}</td>
                   <td>
                     {(hasRole('admin') || hasRole('finance')) && r.payment_status !== 'paid' && (
                       <button className="btn" onClick={() => markPaid(r.id)}>Đã thanh toán</button>
@@ -538,6 +544,27 @@ export default function Purchases() {
         </div>
       )}
     </div>
+    {viewer.open && (
+      <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.6)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <div className="card" style={{ width:'90vw', maxWidth:1100 }}>
+          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+            <button className="btn" onClick={()=> setViewer(s=> ({ ...s, scale: Math.max(0.25, s.scale-0.25) }))}>−</button>
+            <div className="muted">{Math.round(viewer.scale*100)}%</div>
+            <button className="btn" onClick={()=> setViewer(s=> ({ ...s, scale: Math.min(6, s.scale+0.25) }))}>+</button>
+            <button className="btn" onClick={()=> setViewer(s=> ({ ...s, scale:1 }))}>100%</button>
+            <div style={{flex:1}}></div>
+            <button className="btn" onClick={()=> setViewer({ open:false, url:'', scale:1, img:true })}>Đóng</button>
+          </div>
+          <div style={{ marginTop:8, border:'1px solid #e8dac2', borderRadius:12, overflow:'auto', maxHeight:'70vh' }}>
+            {viewer.img ? (
+              <img src={viewer.url} style={{ transform:`scale(${viewer.scale})`, transformOrigin:'center top', display:'block', maxWidth:'100%' }} onError={()=> setViewer(s=> ({ ...s, img:false }))} />
+            ) : (
+              <iframe title="viewer" src={viewer.url} style={{ width:'100%', height:'70vh', border:0 }} />
+            )}
+          </div>
+        </div>
+      </div>
+    )}
   );
 }
   const analyzeImageFile = (file) => new Promise((resolve) => {
