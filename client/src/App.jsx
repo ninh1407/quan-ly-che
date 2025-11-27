@@ -33,6 +33,7 @@ export default function App() {
   const [installEvt, setInstallEvt] = useState(null)
   const [iosGuideOpen, setIosGuideOpen] = useState(false)
   const [isIOS, setIsIOS] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const [badges, setBadges] = useState({ sales: 0, purchases: 0 })
   const rolesRaw = (() => { try { const r = JSON.parse(localStorage.getItem('roles')||'null'); if (Array.isArray(r)) return r; } catch {} const s = (localStorage.getItem('role')||'user'); return String(s).split(',').map(x=>x.trim()).filter(Boolean) })()
   const hasRole = (name) => rolesRaw.includes(name)
@@ -74,6 +75,9 @@ export default function App() {
       const isiOS = /iPad|iPhone|iPod/.test(ua) || ((navigator.platform||'')==='MacIntel' && Number(navigator.maxTouchPoints||0)>1)
       const isSafari = /Safari/i.test(ua) && !/Chrome/i.test(ua)
       setIsIOS(isiOS && isSafari)
+      const isMobileUA = /Android|iPhone|iPad|iPod/i.test(ua)
+      const isSmall = (typeof window!=='undefined') ? (window.innerWidth <= 768) : false
+      setIsMobile(isMobileUA || isSmall)
     } catch {}
   }, [])
   const installApp = async () => { try { if (installEvt) { await installEvt.prompt(); setInstallEvt(null) } } catch {} }
@@ -272,6 +276,9 @@ export default function App() {
             </div>
           </div>
         </div>
+      )}
+      {isMobile && (
+        <button className="fab-menu" onClick={() => setMenuOpen(true)}>☰</button>
       )}
     </div>
   )
