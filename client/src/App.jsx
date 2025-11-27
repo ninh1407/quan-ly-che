@@ -47,7 +47,19 @@ export default function App() {
   const go = (k) => { if (allowedTabs.includes(k)) { setTab(k); try { localStorage.setItem('current_tab', k) } catch {} } else toast('Không có quyền truy cập') }
   React.useEffect(() => { if (!allowedTabs.includes(tab)) setTab(allowedTabs[0]) }, [])
   React.useEffect(() => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('theme', theme) }, [theme])
-  React.useEffect(() => { document.documentElement.setAttribute('data-device', 'pc'); localStorage.setItem('device', 'pc') }, [])
+  React.useEffect(() => {
+    try {
+      const ua = navigator.userAgent || ''
+      const isMobileUA = /Android|iPhone|iPad|iPod/i.test(ua)
+      const isSmall = (typeof window!=='undefined') ? (window.innerWidth <= 768) : false
+      const dev = (isMobileUA || isSmall) ? 'mobile' : 'pc'
+      document.documentElement.setAttribute('data-device', dev)
+      localStorage.setItem('device', dev)
+    } catch {
+      document.documentElement.setAttribute('data-device', 'pc')
+      localStorage.setItem('device', 'pc')
+    }
+  }, [])
   React.useEffect(() => {
     const h = (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setCmdOpen(true) } }
     window.addEventListener('keydown', h)
@@ -224,6 +236,11 @@ export default function App() {
                 <button className="btn" onClick={() => setTheme('light')}>Light</button>
                 <button className="btn" style={{ marginLeft:6 }} onClick={() => setTheme('dark')}>Dark</button>
                 <button className="btn" style={{ marginLeft:6 }} onClick={() => setTheme('tea')}>Tea</button>
+              </div>
+              <div className="muted">Chế độ giao diện</div>
+              <div>
+                <button className="btn" onClick={() => { document.documentElement.setAttribute('data-device','mobile'); localStorage.setItem('device','mobile') }}>Mobile</button>
+                <button className="btn" style={{ marginLeft:6 }} onClick={() => { document.documentElement.setAttribute('data-device','pc'); localStorage.setItem('device','pc') }}>PC</button>
               </div>
               <div className="muted">Cài đặt App</div>
               <div>
