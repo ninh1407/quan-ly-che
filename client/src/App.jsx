@@ -126,6 +126,12 @@ export default function App() {
   return (
       <div className="container">
       <h1 className="glass">Quản lý Chè</h1>
+      {isMobile && (
+        <div className="mobile-toolbar" style={{ position:'fixed', top:0, left:0, right:0, padding:'8px 12px', display:'flex', gap:8, alignItems:'center', background:'var(--surface)', borderBottom:'1px solid var(--border)', zIndex:3000 }}>
+          <button className="btn" onClick={() => setMenuOpen(true)}>☰ Menu</button>
+          <button className="btn" onClick={() => setSettingsOpen(true)}>⚙️ Cài đặt</button>
+        </div>
+      )}
       <Breadcrumb tab={tab} />
       <div className="tabs">
           <button className="hamburger-btn" onClick={() => setMenuOpen(true)}>☰ Menu</button>
