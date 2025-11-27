@@ -87,6 +87,19 @@ export default function App() {
       if ('serviceWorker' in navigator) { const reg = await navigator.serviceWorker.getRegistration(); reg && reg.active && reg.active.postMessage({ type:'notify', title, body }) }
     } catch {}
   }
+  const forceUpdate = async () => {
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all((regs||[]).map(r => r.unregister()));
+      }
+      if (window.caches && window.caches.keys) {
+        const ks = await caches.keys();
+        await Promise.all((ks||[]).map(k => caches.delete(k)));
+      }
+    } catch {}
+    try { location.reload(true) } catch { location.reload() }
+  }
   React.useEffect(() => { (async () => { try { const r = await api.get('/notifications'); const items = r.data||[]; setNotifs(items); } catch {} })() }, [notifOpen])
   React.useEffect(() => {
     let timer = null
@@ -131,11 +144,13 @@ export default function App() {
         <button className="btn" onClick={() => setSettingsOpen(true)}>⚙️ Cài đặt</button>
       </div>
       <button className="quick-menu" onClick={() => setMenuOpen(true)} aria-label="Menu">☰</button>
+      <button className="quick-settings" onClick={() => setSettingsOpen(true)} aria-label="Cài đặt">⚙️</button>
       <Breadcrumb tab={tab} />
       <div className="tabs">
           <button className="btn primary mobile-only" onClick={() => setMenuOpen(true)}>☰ Menu</button>
           <button className="hamburger-btn" onClick={() => setMenuOpen(true)}>☰ Menu</button>
           <button className="btn" onClick={() => setTheme(theme === 'light' ? 'dark' : (theme==='dark' ? 'tea' : (theme==='tea' ? 'wood' : 'light')))}>{theme === 'light' ? '🌙 Tối' : (theme==='dark' ? '🍵 Nâu – Xanh lá' : (theme==='tea' ? '🪵 Gỗ truyền thống' : '☀️ Sáng'))}</button>
+          <button className="btn" onClick={() => setSettingsOpen(true)}>⚙️ Cài đặt</button>
           <details className="dropdown" style={{ marginLeft: 'auto' }}>
             <summary className="btn avatar"><span className="circle">{(localStorage.getItem('username')||'N')[0].toUpperCase()}</span> {(localStorage.getItem('username')||'Người dùng')} ▾</summary>
           <div className="dropdown-menu">
@@ -255,6 +270,10 @@ export default function App() {
               <div className="muted">Cài đặt App</div>
               <div>
                 <button className="btn" disabled={!installEvt} onClick={installApp}>{installEvt ? 'Cài đặt trên màn hình' : 'Đã cài hoặc không hỗ trợ'}</button>
+              </div>
+              <div className="muted">Cập nhật phiên bản</div>
+              <div>
+                <button className="btn" onClick={forceUpdate}>Làm mới ứng dụng</button>
               </div>
               <div className="muted">Cài đặt trên iPhone/iPad</div>
               <div>
