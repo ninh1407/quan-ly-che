@@ -21,22 +21,24 @@
   </head>
   <body>
     <div id="root"></div>
+    <div id="boot-overlay" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#ffffff;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s">
+      <div style="padding:16px 20px;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.08);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111827">
+        <div id="boot-msg">Đang tải ứng dụng…</div>
+        <div style="margin-top:10px;text-align:right"><button id="boot-refresh" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#F1F5F9">Làm mới</button></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
-      (async () => {
-        try {
-          const regs = await navigator.serviceWorker.getRegistrations();
-          for (const r of (regs||[])) await r.unregister();
-          if (window.caches && window.caches.keys) {
-            const ks = await caches.keys();
-            for (const k of ks) await caches.delete(k);
-          }
-        } catch {}
-        try {
-          if (localStorage.getItem('sw') === 'on' && 'serviceWorker' in navigator) {
-            await navigator.serviceWorker.register('/sw.js')
-          }
-        } catch {}
+      (function(){
+        const overlay = document.getElementById('boot-overlay');
+        const refresh = document.getElementById('boot-refresh');
+        const msg = document.getElementById('boot-msg');
+        let shown = false;
+        function show(text){ if(!shown){ overlay.style.opacity = '1'; overlay.style.pointerEvents='auto'; msg.textContent = text || 'Đang tải ứng dụng…'; shown=true } }
+        window.addEventListener('error', function(){ show('Lỗi tải ứng dụng. Thử làm mới cache.') })
+        window.addEventListener('unhandledrejection', function(){ show('Lỗi tải ứng dụng. Thử làm mới cache.') })
+        setTimeout(function(){ if(!document.getElementById('root').innerHTML.trim()){ show('Đang tải… Nếu lâu quá, hãy bấm Làm mới') } }, 2500)
+        refresh.addEventListener('click', async function(){ try { if ('serviceWorker' in navigator) { const regs = await navigator.serviceWorker.getRegistrations(); for (const r of (regs||[])) await r.unregister() } if (window.caches && window.caches.keys) { const ks = await caches.keys(); for (const k of ks) await caches.delete(k) } } catch {} location.reload(true) })
       })();
     </script>
   </body>
