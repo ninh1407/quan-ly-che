@@ -310,3 +310,14 @@ export default function App() {
     </div>
   )
 }
+  React.useEffect(() => {
+    const closeOutside = (e) => {
+      document.querySelectorAll('details.dropdown[open]').forEach((d) => { if (!d.contains(e.target)) d.removeAttribute('open') })
+    }
+    document.addEventListener('click', closeOutside, true)
+    document.addEventListener('touchstart', closeOutside, true)
+    return () => {
+      document.removeEventListener('click', closeOutside, true)
+      document.removeEventListener('touchstart', closeOutside, true)
+    }
+  }, [])
