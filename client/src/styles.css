@@ -19,7 +19,7 @@
 @media (min-width:769px){ .quick-settings{display:none} }
 .drawer{position:fixed;inset:0;display:none;background:rgba(0,0,0,.35);backdrop-filter:blur(2px);z-index:2000}
 .drawer.open{display:block}
-.drawer-panel{position:absolute;top:0;left:0;width:280px;height:100%;background:var(--surface);border-right:1px solid var(--border);box-shadow:0 8px 24px var(--shadow);padding:16px;display:flex;flex-direction:column;gap:10px;z-index:2001}
+.drawer-panel{position:absolute;top:0;left:0;width:280px;height:100%;background:var(--surface);border-right:1px solid var(--border);box-shadow:0 8px 24px var(--shadow);padding:16px;display:flex;flex-direction:column;gap:10px;z-index:2001;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px}
 .drawer-close{position:absolute;top:10px;right:10px}
 .chatbot{position:fixed;right:18px;bottom:18px;z-index:60}
 .chatbot-toggle{background:#4A5568;color:#fff;border:none;border-radius:22px;padding:10px 14px;cursor:pointer}
@@ -148,7 +148,7 @@ body{margin:0}
 [data-device="mobile"] .card{border-radius:18px;padding:16px;overflow:visible}
 [data-device="mobile"] .table-wrap{overflow-x:auto}
 [data-device="mobile"] .hero{padding:20px;border-radius:18px}
-[data-device="mobile"] .tabs{gap:8px;padding:6px 0;overflow-x:auto;top:56px}
+[data-device="mobile"] .tabs{gap:8px;padding:6px 0;overflow-x:auto;top:56px;flex-wrap:nowrap;white-space:nowrap;-webkit-overflow-scrolling:touch}
 [data-device="mobile"] .tabs .btn,[data-device="mobile"] .hamburger-btn{padding:8px 10px;font-size:14px;height:auto}
 [data-device="mobile"] .grid-2{grid-template-columns:1fr;gap:10px}
 [data-device="mobile"] .section-bar{padding:8px 10px;gap:10px}
@@ -324,7 +324,7 @@ html{scroll-behavior:smooth; background: var(--bg)}
 .btn.primary:hover{background:#8b4e26}
 [data-device="mobile"] .mobile-toolbar{display:grid;grid-template-columns:1fr auto;gap:8px;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:50}
 [data-device="mobile"] .mobile-toolbar select{height:44px;border:1px solid var(--border);border-radius:12px;padding:0 12px;background:var(--surface);color:var(--text)}
-[data-device="mobile"] .tabs{display:none}
+[data-device="mobile"] .tabs{display:flex}
 .mobile-optimized .tabs{gap:8px}
 .mobile-optimized h2{font-size:18px}
 .mobile-optimized .section-bar{padding:8px 10px;border-radius:12px}
