@@ -111,6 +111,8 @@ body{background:var(--bg)}
   .form .btn.primary{width:100%}
   .section-bar{flex-wrap:wrap}
   .hero{display:none !important}
+  .hamburger-btn{position:fixed;top:8px;left:8px;z-index:3000;border-radius:12px}
+  .tabs{padding-top:48px}
 }
 .device-override{display:block}
 [data-device="mobile"] .form{grid-template-columns:1fr}
