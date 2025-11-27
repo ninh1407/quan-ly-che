@@ -277,9 +277,7 @@ export default function App() {
           </div>
         </div>
       )}
-      {isMobile && (
-        <button className="fab-menu" onClick={() => setMenuOpen(true)}>☰</button>
-      )}
+      <button className="fab-menu" onClick={() => setMenuOpen(true)} aria-label="Menu">☰</button>
     </div>
   )
 }

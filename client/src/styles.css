@@ -6,7 +6,7 @@
 .hamburger-btn{padding:10px 12px;border:1px solid var(--border);background:var(--accent);border-radius:10px}
 .hamburger-btn{display:inline-block}
 .hamburger-btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
-.fab-menu{position:fixed;bottom:14px;right:14px;width:52px;height:52px;border-radius:999px;background:var(--primary);color:#fff;border:none;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:3000;font-size:22px}
+.fab-menu{position:fixed;bottom:calc(12px + env(safe-area-inset-bottom, 0px));right:calc(12px + env(safe-area-inset-right, 0px));width:52px;height:52px;border-radius:999px;background:var(--primary);color:#fff;border:none;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:3000;font-size:22px}
 .fab-menu:active{transform:translateY(1px)}
 .drawer{position:fixed;inset:0;display:none;background:rgba(0,0,0,.35);backdrop-filter:blur(2px);z-index:2000}
 .drawer.open{display:block}
