@@ -193,7 +193,6 @@ export default function Expenses() {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'image/*,.pdf';
-      input.capture = 'environment';
       input.onchange = async (e) => {
         const f = e.target.files && e.target.files[0]; if (!f) return;
         const MAX = 5 * 1024 * 1024; if (f.size > MAX) { setError('Tệp phải nhỏ hơn 5MB'); return; }

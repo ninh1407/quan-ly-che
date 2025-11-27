@@ -560,7 +560,7 @@ export default function Sales() {
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.35)', display:'flex', alignItems:'center', justifyContent:'center' }}>
           <div className="card" style={{ width: 420 }}>
             <div style={{ fontWeight:700, marginBottom:8 }}>Đính kèm ảnh/PDF giao dịch (&lt;5MB)</div>
-            <input type="file" accept="image/*,.pdf" capture="environment" onChange={async (e) => {
+            <input type="file" accept="image/*,.pdf" onChange={async (e) => {
               const f = e.target.files && e.target.files[0]; if (!f) return;
               if (f.size > 5*1024*1024) { setPayModal(s=>({ ...s, error:'Tệp phải nhỏ hơn 5MB' })); e.target.value=''; return; }
               try {
