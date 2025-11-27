@@ -223,10 +223,17 @@ async function nextId(coll) {
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme-secret';
 const RATE = new Map();
 const ENC_DIR = 'uploads_enc';
-function aesKey() { try { return crypto.createHash('sha256').update(String(JWT_SECRET)).digest() } catch { return Buffer.alloc(32, 0) } }
+function fileKeys() {
+  const primary = String(process.env.FILES_SECRET || JWT_SECRET || '');
+  const keys = [];
+  try { keys.push(crypto.createHash('sha256').update(primary).digest()) } catch { keys.push(Buffer.alloc(32,0)) }
+  const alt = String(JWT_SECRET||'');
+  if (primary !== alt) { try { keys.push(crypto.createHash('sha256').update(alt).digest()) } catch {} }
+  return keys;
+}
 function encryptBuffer(buf) {
   const iv = crypto.randomBytes(12);
-  const key = aesKey();
+  const key = fileKeys()[0];
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
   const ct = Buffer.concat([cipher.update(buf), cipher.final()]);
   const tag = cipher.getAuthTag();
@@ -239,17 +246,29 @@ function decryptBuffer(data) {
     const iv = data.slice(4, 16);
     const tag = data.slice(16, 32);
     const ct = data.slice(32);
-    const key = aesKey();
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-    decipher.setAuthTag(tag);
-    return Buffer.concat([decipher.update(ct), decipher.final()]);
+    const keys = fileKeys();
+    for (let i=0;i<keys.length;i++) {
+      try {
+        const decipher = crypto.createDecipheriv('aes-256-gcm', keys[i], iv);
+        decipher.setAuthTag(tag);
+        return Buffer.concat([decipher.update(ct), decipher.final()]);
+      } catch {}
+    }
+    return null;
   } catch {
     return null;
   }
 }
 function contentTypeFromName(name) {
   const ext = (String(name||'').replace(/\.enc$/,'').match(/\.([a-zA-Z0-9]+)$/) || [null,'jpg'])[1].toLowerCase();
-  return ext === 'png' ? 'image/png' : (ext === 'webp' ? 'image/webp' : 'image/jpeg');
+  if (ext === 'png') return 'image/png';
+  if (ext === 'webp') return 'image/webp';
+  if (ext === 'pdf') return 'application/pdf';
+  return 'image/jpeg';
+}
+function contentDispositionInline(name) {
+  const base = String(name||'').replace(/^.*\//,'').replace(/\.enc$/,'');
+  return `inline; filename="${base}"`;
 }
 function rateLimit(windowMs, max, bucket) {
   return function (req, res, next) {
@@ -1283,9 +1302,11 @@ app.get('/sales/:id/receipt', requireAuth, (req, res) => {
         const dec = decryptBuffer(data);
         if (!dec) return res.status(500).json({ message: 'Decrypt failed' });
         res.setHeader('Content-Type', contentTypeFromName(safe));
+        res.setHeader('Content-Disposition', contentDispositionInline(safe));
         return res.send(dec);
       } catch (e) { return res.status(500).json({ message: 'File read error', detail: e.message }) }
     }
+    res.setHeader('Content-Disposition', contentDispositionInline(safe));
     return res.sendFile(abs);
   };
   if (MONGO_READY) {
@@ -1801,15 +1822,15 @@ app.get('/receipts', requireAuth, async (req, res) => {
 
 // Audit logs viewer
 app.get('/admin/audit-logs', requireAdmin, (req, res) => {
-  const { limit = 100, offset = 0, table, action, user, record_id } = req.query||{}
+  const { limit = 100, offset = 0, entity, action, user, entity_id } = req.query||{}
   if (!SQLITE_READY) return res.status(500).json({ message:'DB error', detail:'SQLite disabled' })
   const where = []
   const params = []
-  if (table) { where.push('table_name = ?'); params.push(String(table)) }
+  if (entity) { where.push('entity = ?'); params.push(String(entity)) }
   if (action) { where.push('action = ?'); params.push(String(action)) }
   if (user) { where.push('user = ?'); params.push(String(user)) }
-  if (record_id) { where.push('record_id = ?'); params.push(Number(record_id)) }
-  const sql = `SELECT id, at, user, action, table_name, record_id, before, after FROM audit_logs ${where.length?('WHERE '+where.join(' AND ')):''} ORDER BY id DESC LIMIT ? OFFSET ?`
+  if (entity_id) { where.push('entity_id = ?'); params.push(Number(entity_id)) }
+  const sql = `SELECT id, ts, user, action, entity, entity_id, changes FROM audit_logs ${where.length?('WHERE '+where.join(' AND ')):''} ORDER BY ts DESC, id DESC LIMIT ? OFFSET ?`
   db.all(sql, [...params, Number(limit), Number(offset)], (err, rows) => {
     if (err) return res.status(500).json({ message:'DB error', detail:err.message })
     res.json(rows||[])
@@ -1836,22 +1857,31 @@ app.post('/admin/import', requireAdmin, (req, res) => {
   if (!rows.length) return res.status(400).json({ message:'No rows' })
   if (!SQLITE_READY) return res.status(500).json({ message:'DB error', detail:'SQLite disabled' })
   const results = { inserted: 0, failed: 0, errors: [] }
-  const runBatch = (sql, params) => new Promise((resolve) => db.run(sql, params, function(err){ if(err){ results.failed++; results.errors.push(String(err.message||'error')) } else { results.inserted++ } resolve() }))
+  const normalizeNum = (v) => { const s=String(v||'').toLowerCase(); const mult=/k|nghìn|ngàn/.test(s)?1000:/tr|triệu|m/.test(s)?1_000_000:1; const dig=s.replace(/[^\d]/g,''); return dig?Number(dig)*mult:0 }
+  const insertDynamic = (table, obj) => new Promise((resolve) => {
+    db.all(`PRAGMA table_info(${table})`, [], (e, cols) => {
+      if (e) { results.failed++; results.errors.push(String(e.message||'error')); return resolve() }
+      const names = new Set((cols||[]).map(c=>c.name))
+      const row = { ...obj }
+      const commonUser = String(req.user?.username||'')
+      if (table==='sales'){ row.created_by = commonUser; row.owner = commonUser; row.price_per_kg = normalizeNum(row.price_per_kg); row.weight = normalizeNum(row.weight) }
+      if (table==='purchases'){ row.owner = commonUser; row.unit_price = normalizeNum(row.unit_price); row.weight = normalizeNum(row.weight); if (row.net_weight!=null) row.net_weight = normalizeNum(row.net_weight); if (row.water_percent!=null) row.water_percent = Number(row.water_percent) }
+      if (table==='expenses'){ row.owner = commonUser; row.amount = normalizeNum(row.amount) }
+      const fields = []; const vals = []
+      Object.keys(row).forEach(k => { if (names.has(k)) { fields.push(k); vals.push(row[k]===''?null:row[k]) } })
+      if (!fields.length) { results.failed++; results.errors.push('No matching columns'); return resolve() }
+      const placeholders = fields.map(()=>'?').join(',')
+      const sql = `INSERT INTO ${table} (${fields.join(',')}) VALUES (${placeholders})`
+      db.run(sql, vals, function(err){ if(err){ results.failed++; results.errors.push(String(err.message||'error')) } else { results.inserted++ } resolve() })
+    })
+  })
   const go = async () => {
     for (const r of rows) {
       try {
-        if (type==='sales') {
-          const sale_date=r.sale_date, customer_name=r.customer_name||'', tea_type=r.tea_type||'', price_per_kg=Number(r.price_per_kg||0), weight=Number(r.weight||0), payment_status=r.payment_status||'pending'
-          await runBatch(`INSERT INTO sales (sale_date, customer_name, tea_type, price_per_kg, weight, payment_status, ticket_name, invoice_no, contract, created_by, owner, issued_by, export_type, country) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [sale_date, customer_name, tea_type, price_per_kg, weight, payment_status, r.ticket_name||null, r.invoice_no||null, r.contract||null, String(req.user?.username||''), String(req.user?.username||''), r.issued_by||null, r.export_type||null, r.country||null])
-        } else if (type==='purchases') {
-          const purchase_date=r.purchase_date, supplier_name=r.supplier_name||'', weight=Number(r.weight||0), unit_price=Number(r.unit_price||0), payment_status=r.payment_status||'pending'
-          await runBatch(`INSERT INTO purchases (purchase_date, supplier_name, weight, unit_price, payment_status, water_percent, net_weight, ticket_name, invoice_no, weigh_ticket_code, vehicle_plate, owner) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, [purchase_date, supplier_name, weight, unit_price, payment_status, r.water_percent!=null?Number(r.water_percent):null, r.net_weight!=null?Number(r.net_weight):null, r.ticket_name||null, r.invoice_no||null, r.weigh_ticket_code||null, r.vehicle_plate||null, String(req.user?.username||'')])
-        } else if (type==='expenses') {
-          const expense_date=r.expense_date, description=r.description||'', amount=Number(r.amount||0), category=r.category||null
-          await runBatch(`INSERT INTO expenses (expense_date, description, amount, category, owner) VALUES (?,?,?,?,?)`, [expense_date, description, amount, category, String(req.user?.username||'')])
-        } else {
-          results.failed++; results.errors.push('Unknown type')
-        }
+        if (type==='sales') await insertDynamic('sales', r)
+        else if (type==='purchases') await insertDynamic('purchases', r)
+        else if (type==='expenses') await insertDynamic('expenses', r)
+        else { results.failed++; results.errors.push('Unknown type') }
       } catch (e) { results.failed++; results.errors.push(String(e.message||'error')) }
     }
     res.json(results)
@@ -1888,9 +1918,11 @@ app.get('/purchases/:id/receipt', requireAuth, (req, res) => {
         const dec = decryptBuffer(data);
         if (!dec) return res.status(500).json({ message: 'Decrypt failed' });
         res.setHeader('Content-Type', contentTypeFromName(safe));
+        res.setHeader('Content-Disposition', contentDispositionInline(safe));
         return res.send(dec);
       } catch (e) { return res.status(500).json({ message: 'File read error', detail: e.message }) }
     }
+    res.setHeader('Content-Disposition', contentDispositionInline(safe));
     return res.sendFile(abs);
   };
   if (MONGO_READY) {
@@ -2071,9 +2103,11 @@ app.get('/expenses/:id/receipt', requireAuth, (req, res) => {
         const dec = decryptBuffer(data);
         if (!dec) return res.status(500).json({ message: 'Decrypt failed' });
         res.setHeader('Content-Type', contentTypeFromName(safe));
+        res.setHeader('Content-Disposition', contentDispositionInline(safe));
         return res.send(dec);
       } catch (e) { return res.status(500).json({ message: 'File read error', detail: e.message }) }
     }
+    res.setHeader('Content-Disposition', contentDispositionInline(safe));
     return res.sendFile(abs);
   };
   if (MONGO_READY) {

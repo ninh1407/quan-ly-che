@@ -442,11 +442,11 @@ export default function Sales() {
         </div>
         <div className="card" style={{ marginTop:8, padding:12 }} onDragOver={(e)=> e.preventDefault()} onDrop={(e)=>{
           e.preventDefault(); const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(!f){return}
-          if(!selected.length){ setError('Hãy chọn một dòng để đính kèm ảnh rồi thả ảnh vào'); return }
-          const id=selected[0]; if(f.size>5*1024*1024){ setError('Ảnh phải nhỏ hơn 5MB'); return }
+          if(!selected.length){ setError('Hãy chọn một dòng để đính kèm tệp rồi thả vào'); return }
+          const id=selected[0]; if(f.size>5*1024*1024){ setError('Tệp phải nhỏ hơn 5MB'); return }
           const reader=new FileReader(); reader.onload=()=> setPayModal({ id, file:{ name:f.name, data: reader.result }, error:'' }); reader.readAsDataURL(f)
         }}>
-          Kéo thả ảnh vào đây để đính kèm cho dòng đã chọn
+          Kéo thả ảnh/PDF vào đây để đính kèm cho dòng đã chọn
         </div>
         {hint && <div className="muted" style={{ gridColumn:'1/-1', marginTop:8 }}>{hint}</div>}
         {editingId && <button className="btn" type="button" onClick={() => { setEditingId(null); setForm({ sale_date: '', customer_name: '', tea_type: '', price_per_kg: '', weight: '', payment_status: 'pending' }); }}>Hủy</button>}
@@ -509,7 +509,7 @@ export default function Sales() {
                   <td className="num">{(Number(r.weight)||0).toLocaleString()}</td>
                   <td className="num">{fmtMoney(r.total_amount)}</td>
                   <td><span className={`pill ${r.payment_status}`}>{STATUS_LABELS[r.payment_status] || r.payment_status}</span></td>
-                  <td>{r.receipt_path ? (<a href={receiptEndpoint('sales', r.id)} target="_blank" rel="noreferrer">Xem ảnh</a>) : (<span className="muted">Chưa có ảnh</span>)}</td>
+                  <td>{r.receipt_path ? (<a href={receiptEndpoint('sales', r.id)} target="_blank" rel="noreferrer">Xem</a>) : (<span className="muted">Chưa có tệp</span>)}</td>
                   <td>
                     {(hasRole('admin') || hasRole('finance')) && r.payment_status !== 'paid' && (
                       <button className="btn" onClick={() => markPaid(r.id)}>Đã thanh toán</button>
@@ -560,18 +560,23 @@ export default function Sales() {
       {payModal.id && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.35)', display:'flex', alignItems:'center', justifyContent:'center' }}>
           <div className="card" style={{ width: 420 }}>
-            <div style={{ fontWeight:700, marginBottom:8 }}>Đính kèm ảnh giao dịch (&lt;5MB)</div>
-            <input type="file" accept="image/*" capture="environment" onChange={async (e) => {
+            <div style={{ fontWeight:700, marginBottom:8 }}>Đính kèm ảnh/PDF giao dịch (&lt;5MB)</div>
+            <input type="file" accept="image/*,.pdf" capture="environment" onChange={async (e) => {
               const f = e.target.files && e.target.files[0]; if (!f) return;
-              if (f.size > 5*1024*1024) { setPayModal(s=>({ ...s, error:'Ảnh phải nhỏ hơn 5MB' })); e.target.value=''; return; }
+              if (f.size > 5*1024*1024) { setPayModal(s=>({ ...s, error:'Tệp phải nhỏ hơn 5MB' })); e.target.value=''; return; }
               try {
-                if (f.size > 1024*1024) {
-                  const out = await compressImage(f);
-                  setPayModal(s=>({ ...s, file: { name: out.name, data: out.data } }));
+                if (String(f.type||'').startsWith('image/')) {
+                  if (f.size > 1024*1024) {
+                    const out = await compressImage(f);
+                    setPayModal(s=>({ ...s, file: { name: out.name, data: out.data } }));
+                  } else {
+                    const r = new FileReader(); r.onload = () => setPayModal(s=>({ ...s, file: { name: f.name, data: r.result } })); r.readAsDataURL(f);
+                  }
+                  const w = await analyzeImageFile(f); setImgWarn(w)
                 } else {
                   const r = new FileReader(); r.onload = () => setPayModal(s=>({ ...s, file: { name: f.name, data: r.result } })); r.readAsDataURL(f);
+                  setImgWarn([])
                 }
-                const w = await analyzeImageFile(f); setImgWarn(w)
               } catch { setPayModal(s=>({ ...s, error:'Nén ảnh lỗi' })) }
             }} />
             {imgWarn.length>0 && <div className="error" style={{ marginTop:6 }}>{imgWarn.join(' • ')}</div>}
@@ -583,7 +588,7 @@ export default function Sales() {
               </label>
               <button className="btn" onClick={() => setPayModal({ id:null, file:null, error:'', ack:false })}>Hủy</button>
               <button className={`btn primary ${!payModal.ack?'disabled':''}`} onClick={async () => {
-                if (!payModal.file) { setPayModal(s=>({ ...s, error:'Vui lòng chọn ảnh (&lt;5MB)' })); return; }
+                if (!payModal.file) { setPayModal(s=>({ ...s, error:'Vui lòng chọn tệp (&lt;5MB)' })); return; }
                 if (!payModal.ack) { setPayModal(s=>({ ...s, error:'Vui lòng tick xác nhận trước khi ghi' })); return; }
                 try {
                   await api.put(`/sales/${payModal.id}`, { payment_status: 'paid', receipt_data: payModal.file.data, receipt_name: payModal.file.name })

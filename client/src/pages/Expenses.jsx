@@ -192,16 +192,21 @@ export default function Expenses() {
     try {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = 'image/*';
+      input.accept = 'image/*,.pdf';
       input.capture = 'environment';
       input.onchange = async (e) => {
         const f = e.target.files && e.target.files[0]; if (!f) return;
-        const MAX = 5 * 1024 * 1024; if (f.size > MAX) { setError('Ảnh phải nhỏ hơn 5MB'); return; }
+        const MAX = 5 * 1024 * 1024; if (f.size > MAX) { setError('Tệp phải nhỏ hơn 5MB'); return; }
         try {
           let payload = {};
-          if (f.size > 1024*1024) {
-            const out = await compressImage(f);
-            payload = { receipt_data: out.data, receipt_name: out.name };
+          if (String(f.type||'').startsWith('image/')) {
+            if (f.size > 1024*1024) {
+              const out = await compressImage(f);
+              payload = { receipt_data: out.data, receipt_name: out.name };
+            } else {
+              const r = new FileReader();
+              payload = await new Promise((resolve) => { r.onload = () => resolve({ receipt_data: r.result, receipt_name: f.name }); r.readAsDataURL(f); });
+            }
           } else {
             const r = new FileReader();
             payload = await new Promise((resolve) => { r.onload = () => resolve({ receipt_data: r.result, receipt_name: f.name }); r.readAsDataURL(f); });
