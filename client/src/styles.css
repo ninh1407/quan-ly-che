@@ -1,4 +1,4 @@
-.container{max-width:1280px;margin:24px auto;padding:0 20px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--text)}
+.container{max-width:none;width:100%;margin:0 auto;padding:0 12px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--text)}
 .tabs{margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:50}
 [data-device="pc"] .mobile-toolbar{display:none}
 .mobile-toolbar{display:none}
@@ -24,7 +24,7 @@
 .btn.primary{background:var(--primary);color:#fff;border-color:var(--primary);box-shadow:0 2px 6px rgba(25,118,210,.3)}
 .card{border:1px solid var(--border);border-radius:16px;padding:20px;background:var(--surface);box-shadow:0 8px 24px rgba(0,0,0,.08)}
 .chart-card{height:260px;overflow:hidden;position:relative}
-.filters{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:6px;align-items:center}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;align-items:center}
 .form{display:grid;grid-template-columns:1fr;gap:6px;align-items:center}
 .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 @media (max-width:992px){.form-grid{grid-template-columns:1fr}}
@@ -49,7 +49,7 @@ input[type="number"]{text-align:right}
 .table-wrap{width:100%;overflow-x:auto}
 .card .table-wrap{max-width:100%}
 .card{overflow:visible;max-width:100%;box-sizing:border-box}
-.table{min-width:560px;width:100%;border-collapse:separate;border-spacing:0;margin-top:14px}
+.table{min-width:0;width:100%;border-collapse:separate;border-spacing:0;margin-top:14px}
 .table th,.table td{white-space:normal}
 .table{font-size:16px;line-height:1.5}
 .table th{background:#f1f5f9;color:var(--text);border-bottom:1px solid var(--border);padding:16px;text-align:left;height:auto}
@@ -100,7 +100,7 @@ body{background:var(--bg)}
 .skeleton{display:block;position:relative;overflow:hidden;background:linear-gradient(90deg, rgba(203,213,225,.3) 25%, rgba(203,213,225,.6) 37%, rgba(203,213,225,.3) 63%);background-size:400% 100%;animation:skeleton-shine 1.2s ease-in-out infinite}
 .skeleton-line{height:14px;border-radius:6px;margin:8px 0}
 @keyframes skeleton-shine{0%{background-position:200% 0}100%{background-position:-200% 0}}
-@media (max-width:768px){.container{padding:0 14px}.btn{padding:8px 12px}.card{padding:14px;border-radius:12px}.table th,.table td{padding:10px}.tabs{top:0}.table{min-width:700px}}
+@media (max-width:768px){.container{padding:0 14px}.btn{padding:8px 12px}.card{padding:14px;border-radius:12px}.table th,.table td{padding:10px}.tabs{top:0}.table{min-width:0}}
 @media (max-width:768px){.nav-buttons{display:none}.hamburger-btn{display:inline-block}}
 @media (max-width:768px){.container{padding:0 14px}.btn{padding:8px 12px}.card{padding:14px;border-radius:12px}.table th,.table td{padding:10px}}
 .mobile-only{display:none}
