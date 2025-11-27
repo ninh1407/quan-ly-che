@@ -92,6 +92,7 @@ h1{background:var(--primary);color:#fff;padding:14px 16px;border-radius:16px;box
 .form .btn.primary{width:100%}
 .badge{display:inline-block;padding:2px 6px;border-radius:999px;background:#7c3aed;color:#fff;font-size:12px}
 body{background:var(--bg)}
+body{margin:0}
 /* Hero branding for tea trading */
 .hero{position:relative;border-radius:20px;padding:32px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#e0f2fe 0%,#fef3c7 60%,#fce7f3 100%);box-shadow:0 10px 28px rgba(0,0,0,.08);margin-bottom:16px;border:1px solid var(--border)}
 .hero{margin-bottom:24px}
@@ -117,6 +118,7 @@ body{background:var(--bg)}
 .mobile-only{display:none}
 /* Mobile top toolbar */
 .mobile-toolbar{position:fixed;top:calc(env(safe-area-inset-top, 0px));left:0;right:0;padding:8px 12px;display:flex;gap:8;align-items:center;background:var(--surface);border-bottom:1px solid var(--border);z-index:4000}
+.mobile-toolbar .btn{background:var(--primary);color:#fff;border-color:var(--primary)}
 @media (max-width:768px){
   .form{grid-template-columns:1fr;gap:10px}
   input,select{height:48px}
@@ -127,6 +129,8 @@ body{background:var(--bg)}
   .hamburger-btn{position:fixed;top:8px;left:8px;z-index:3000;border-radius:12px}
   .tabs{padding-top:48px}
   .mobile-toolbar{display:flex}
+  .mobile-only{display:inline-block}
+  h1{display:none}
 }
 .device-override{display:block}
 [data-device="pc"] .mobile-toolbar{display:none}

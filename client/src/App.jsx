@@ -133,6 +133,7 @@ export default function App() {
       <button className="quick-menu" onClick={() => setMenuOpen(true)} aria-label="Menu">☰</button>
       <Breadcrumb tab={tab} />
       <div className="tabs">
+          <button className="btn primary mobile-only" onClick={() => setMenuOpen(true)}>☰ Menu</button>
           <button className="hamburger-btn" onClick={() => setMenuOpen(true)}>☰ Menu</button>
           <button className="btn" onClick={() => setTheme(theme === 'light' ? 'dark' : (theme==='dark' ? 'tea' : (theme==='tea' ? 'wood' : 'light')))}>{theme === 'light' ? '🌙 Tối' : (theme==='dark' ? '🍵 Nâu – Xanh lá' : (theme==='tea' ? '🪵 Gỗ truyền thống' : '☀️ Sáng'))}</button>
           <details className="dropdown" style={{ marginLeft: 'auto' }}>
