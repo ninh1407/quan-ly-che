@@ -8,6 +8,7 @@ export default function Receipts() {
   const [month, setMonth] = useState(now.getMonth()+1)
   const [year, setYear] = useState(now.getFullYear())
   const [type, setType] = useState('all')
+  const [missing, setMissing] = useState(false)
   const [list, setList] = useState([])
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(false)
@@ -24,6 +25,7 @@ export default function Receipts() {
     try {
       const params = { month, year, type }
       if (q) params.q = q
+      if (missing) params.missing = 1
       const r = await api.get('/receipts', { params })
       setList(Array.isArray(r.data) ? r.data : [])
       setPartial(false)
@@ -70,6 +72,9 @@ export default function Receipts() {
         </select>
         <label>Tìm Số HĐ</label>
         <input value={q} onChange={(e)=> setQ(e.target.value)} placeholder="Nhập Số HĐ" />
+        <label style={{ display:'inline-flex', alignItems:'center', gap:6 }}>
+          <input type="checkbox" checked={missing} onChange={(e)=> setMissing(e.target.checked)} /> Thiếu Số HĐ
+        </label>
       </div>
       {error && <div className="error" style={{ marginTop:8 }}>{error}</div>}
       {!error && partial && <div className="muted" style={{ marginTop:8 }}>Một số mục lỗi, đang hiển thị phần khả dụng</div>}

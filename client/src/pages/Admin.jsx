@@ -13,6 +13,9 @@ export default function Admin() {
   const [editingUser, setEditingUser] = useState(null)
   const [pwdForm, setPwdForm] = useState({ id: '', new_password: '' })
   const [backupList, setBackupList] = useState([])
+  const [impType, setImpType] = useState('sales')
+  const [impRows, setImpRows] = useState([])
+  const [impMsg, setImpMsg] = useState('')
 
   const load = async () => {
     setLoading(true); setError('')
@@ -84,6 +87,55 @@ export default function Admin() {
   const restoreBackup = async (name) => { if (!window.confirm(`Khôi phục từ ${name}?`)) return; try { await api.post('/admin/restore', { name }); alert('Khôi phục xong, vui lòng tải lại trang'); } catch (e) { setError(e?.response?.data?.message || 'Khôi phục lỗi') } }
   const [wipeConfirm, setWipeConfirm] = useState('')
   const wipeAll = async () => { if (String(wipeConfirm).toUpperCase() !== 'DELETE') { alert('Nhập DELETE để xác nhận'); return } try { const r = await api.post('/admin/wipe', { confirm: 'DELETE' }); alert(`Đã xóa toàn bộ dữ liệu. Xóa ${r.data?.cleared?.length||0} bảng, ${r.data?.files_removed||0} ảnh.`) } catch (e) { setError(e?.response?.data?.message || 'Xóa dữ liệu lỗi') } }
+
+  const parseCsv = (text) => {
+    const out = []; let row = []; let cur = ''; let inQ = false
+    for (let i=0;i<text.length;i++){
+      const ch = text[i]
+      if (inQ){
+        if (ch === '"' && text[i+1] === '"'){ cur+='"'; i++ }
+        else if (ch === '"'){ inQ=false }
+        else cur += ch
+      } else {
+        if (ch === '"'){ inQ=true }
+        else if (ch === ','){ row.push(cur); cur='' }
+        else if (ch === '\n' || ch === '\r'){ if (cur.length||row.length){ row.push(cur); out.push(row); row=[]; cur='' } }
+        else cur += ch
+      }
+    }
+    if (cur.length||row.length) { row.push(cur); out.push(row) }
+    return out
+  }
+  const handleImportFile = async (e) => {
+    setImpMsg(''); setImpRows([])
+    const f = e.target.files && e.target.files[0]; if (!f) return
+    const r = new FileReader(); r.onload = () => {
+      try {
+        const text = String(r.result||'')
+        const rows = parseCsv(text)
+        const headers = rows.shift().map(h => h.trim())
+        const objs = rows.filter(rr => rr.some(v => String(v||'').trim().length>0)).map(rr => {
+          const o = {}; headers.forEach((h,idx)=>{ o[h]=rr[idx] }); return o
+        })
+        setImpRows(objs)
+      } catch { setImpMsg('Parse CSV lỗi') }
+    }
+    r.readAsText(f, 'utf-8')
+  }
+  const downloadTemplate = async () => {
+    try {
+      const r = await api.get('/admin/import/template', { params: { type: impType }, responseType:'blob' })
+      const url = URL.createObjectURL(r.data); const a = document.createElement('a'); a.href=url; a.download=`template_${impType}.csv`; a.click(); URL.revokeObjectURL(url)
+    } catch { setImpMsg('Tải template lỗi') }
+  }
+  const submitImport = async () => {
+    if (!impRows.length) { setImpMsg('Chưa có dữ liệu để import'); return }
+    try {
+      const r = await api.post('/admin/import', { type: impType, rows: impRows })
+      setImpMsg(`Import xong: ${r.data.inserted} dòng, lỗi ${r.data.failed}`)
+      setImpRows([])
+    } catch (e) { setImpMsg(e?.response?.data?.message || 'Import lỗi') }
+  }
 
   return (
     <div className="card">
@@ -182,7 +234,7 @@ export default function Admin() {
         <div style={{ marginTop: 12 }}>
           {logLoading ? 'Đang tải...' : (
             <table className="table compact">
-              <thead><tr><th>Thời gian</th><th>Người dùng</th><th>Bảng</th><th className="num">ID</th><th>Hành động</th><th>Trường thay đổi</th></tr></thead>
+              <thead><tr><th>Thời gian</th><th>Người dùng</th><th>Bảng</th><th className="num">ID</th><th>Hành động</th><th>Trường đổi</th></tr></thead>
               <tbody>
                 {(logs||[]).map((l,i) => {
                   let changed = ''
@@ -193,6 +245,29 @@ export default function Admin() {
             </table>
           )}
         </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <div style={{ fontWeight:700, marginBottom:8 }}>Import từ Excel (CSV)</div>
+        <div className="row" style={{ gap:8, alignItems:'center' }}>
+          <label>Loại</label>
+          <select value={impType} onChange={(e)=> setImpType(e.target.value)}>
+            <option value="sales">Đơn bán</option>
+            <option value="purchases">Đơn nhập</option>
+            <option value="expenses">Chi phí</option>
+          </select>
+          <button className="btn" onClick={downloadTemplate}>Tải mẫu CSV</button>
+          <input type="file" accept=".csv,text/csv" onChange={handleImportFile} />
+          <button className="btn primary" onClick={submitImport}>Import</button>
+        </div>
+        {impMsg && <div className="muted" style={{ marginTop:8 }}>{impMsg}</div>}
+        {impRows.length>0 && <div className="table-wrap" style={{ marginTop:8 }}>
+          <table className="table compact">
+            <thead><tr>{Object.keys(impRows[0]||{}).map((h,i)=> <th key={i}>{h}</th>)}</tr></thead>
+            <tbody>{impRows.slice(0,10).map((r,i)=> <tr key={i}>{Object.values(r).map((v,j)=> <td key={j}>{String(v||'')}</td>)}</tr>)}</tbody>
+          </table>
+        </div>}
+        <div className="muted" style={{ marginTop:8 }}>Excel → Save As → CSV (Comma). Bắt buộc: Đơn bán: sale_date, customer_name, tea_type, price_per_kg, weight. Đơn nhập: purchase_date, supplier_name, weight, unit_price. Chi phí: expense_date, description, amount.</div>
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>

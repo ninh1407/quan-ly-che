@@ -2,10 +2,19 @@ import React, { useEffect, useMemo, useState } from 'react';
 import api from '../api.js';
 
 const fmtMoney = (v) => (Number(v) || 0).toLocaleString('vi-VN');
-const parseMoneyInput = (s) => Number(String(s || '').replace(/[^\d]/g, ''));
+const parseMoneyInput = (s) => {
+  const raw = String(s || '').toLowerCase();
+  const mult = /k|nghìn|ngàn/.test(raw) ? 1000 : /tr|triệu|m/.test(raw) ? 1_000_000 : 1;
+  const digits = raw.replace(/[^\d]/g, '');
+  const val = digits ? Number(digits) : 0;
+  return val * mult;
+};
 const formatMoneyInput = (s) => {
-  const digits = String(s || '').replace(/[^\d]/g, '');
-  return digits ? Number(digits).toLocaleString('vi-VN') : '';
+  const raw = String(s || '').toLowerCase();
+  const mult = /k|nghìn|ngàn/.test(raw) ? 1000 : /tr|triệu|m/.test(raw) ? 1_000_000 : 1;
+  const digits = raw.replace(/[^\d]/g, '');
+  const val = digits ? Number(digits) * mult : 0;
+  return val ? val.toLocaleString('vi-VN') : '';
 };
 
 function useMonthYear() {
@@ -28,7 +37,7 @@ export default function Sales() {
   const hasRole = (name) => rolesRaw.includes(name)
   const [deleteId, setDeleteId] = useState(null);
   const [selected, setSelected] = useState([]);
-  const [payModal, setPayModal] = useState({ id: null, file: null, error: '' });
+  const [payModal, setPayModal] = useState({ id: null, file: null, error: '', ack: false });
   const [q, setQ] = useState('');
   const [range, setRange] = useState({ from: '', to: '' });
   const [page, setPage] = useState(1); const pageSize = 10;
@@ -378,6 +387,14 @@ export default function Sales() {
         <div className="muted">Tổng tạm tính: {totalPreview.toLocaleString()} • Lợi nhuận ước tính: {profitPreview.toLocaleString()}</div>
         {error && <div className="error">{error}</div>}
         <button className="btn primary" type="submit">{editingId ? 'Lưu chỉnh sửa' : 'Thêm đơn bán'}</button>
+        <div className="card" style={{ marginTop:8, padding:8 }} onDragOver={(e)=> e.preventDefault()} onDrop={(e)=>{
+          e.preventDefault(); const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(!f){return}
+          if(!selected.length){ setError('Hãy chọn một dòng để đính kèm ảnh rồi thả ảnh vào'); return }
+          const id=selected[0]; if(f.size>5*1024*1024){ setError('Ảnh phải nhỏ hơn 5MB'); return }
+          const reader=new FileReader(); reader.onload=()=> setPayModal({ id, file:{ name:f.name, data: reader.result }, error:'' }); reader.readAsDataURL(f)
+        }}>
+          Kéo thả ảnh vào đây để đính kèm cho dòng đã chọn
+        </div>
         {hint && <div className="muted" style={{ marginTop:8 }}>{hint}</div>}
         {editingId && <button className="btn" type="button" onClick={() => { setEditingId(null); setForm({ sale_date: '', customer_name: '', tea_type: '', price_per_kg: '', weight: '', payment_status: 'pending' }); }}>Hủy</button>}
       </form>
@@ -507,12 +524,17 @@ export default function Sales() {
             {imgWarn.length>0 && <div className="error" style={{ marginTop:6 }}>{imgWarn.join(' • ')}</div>}
             {payModal.error && <div className="error" style={{ marginTop:8 }}>{payModal.error}</div>}
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:12 }}>
-              <button className="btn" onClick={() => setPayModal({ id:null, file:null, error:'' })}>Hủy</button>
-              <button className="btn primary" onClick={async () => {
+              <div style={{flex:1}}></div>
+              <label style={{ display:'inline-flex', alignItems:'center', gap:6 }}>
+                <input type="checkbox" checked={payModal.ack} onChange={(e)=> setPayModal(s=>({ ...s, ack:e.target.checked }))} /> Tôi xác nhận ghi nhận đã thanh toán
+              </label>
+              <button className="btn" onClick={() => setPayModal({ id:null, file:null, error:'', ack:false })}>Hủy</button>
+              <button className={`btn primary ${!payModal.ack?'disabled':''}`} onClick={async () => {
                 if (!payModal.file) { setPayModal(s=>({ ...s, error:'Vui lòng chọn ảnh (&lt;5MB)' })); return; }
+                if (!payModal.ack) { setPayModal(s=>({ ...s, error:'Vui lòng tick xác nhận trước khi ghi' })); return; }
                 try {
                   await api.put(`/sales/${payModal.id}`, { payment_status: 'paid', receipt_data: payModal.file.data, receipt_name: payModal.file.name })
-                  setPayModal({ id:null, file:null, error:'' }); await load(); setSelected([])
+                  setPayModal({ id:null, file:null, error:'', ack:false }); await load(); setSelected([])
                 } catch (e) { setPayModal(s=>({ ...s, error: e?.response?.data?.message || 'Cập nhật lỗi' })) }
               }}>Xác nhận</button>
             </div>

@@ -19,7 +19,6 @@ import Breadcrumb from './components/Breadcrumb.jsx'
 import Admin from './pages/Admin.jsx'
 import ChangePassword from './pages/ChangePassword.jsx'
 import Receipts from './pages/Receipts.jsx'
-import ChatBot from './components/ChatBot.jsx'
 
 export default function App() {
   const [tab, setTab] = useState('dashboard')
@@ -76,9 +75,7 @@ export default function App() {
     return () => { if (timer) clearInterval(timer) }
   }, [])
   React.useEffect(() => {
-    const h = (e) => { const tabName = e.detail; if (typeof tabName === 'string') go(tabName) }
-    window.addEventListener('chatbot:navigate', h)
-    return () => window.removeEventListener('chatbot:navigate', h)
+    
   }, [])
   if (!authed) {
     return (
@@ -164,7 +161,6 @@ export default function App() {
           {tab === 'stats' && <Stats />}
           {tab === 'tradeStats' && <TradeStats />}
           {tab === 'admin' && <Admin />}
-          <ChatBot />
       {accountOpen && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.35)', display:'flex', alignItems:'center', justifyContent:'center' }}>
           <div className="card" style={{ width: 380 }}>

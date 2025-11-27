@@ -59,6 +59,17 @@ let PURCHASES_HAS_TOTAL_COST = false;
 if (SQLITE_READY) {
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA busy_timeout = 3000');
+  try {
+    db.serialize(() => {
+      db.run("CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(sale_date)")
+      db.run("CREATE INDEX IF NOT EXISTS idx_sales_payment ON sales(payment_status)")
+      db.run("CREATE INDEX IF NOT EXISTS idx_sales_invoice ON sales(invoice_no)")
+      db.run("CREATE INDEX IF NOT EXISTS idx_purchases_date ON purchases(purchase_date)")
+      db.run("CREATE INDEX IF NOT EXISTS idx_purchases_payment ON purchases(payment_status)")
+      db.run("CREATE INDEX IF NOT EXISTS idx_purchases_invoice ON purchases(invoice_no)")
+      db.run("CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, user TEXT, entity TEXT, entity_id INTEGER, action TEXT, changes TEXT, ip TEXT, ua TEXT, city TEXT)")
+    })
+  } catch {}
 }
 
 function ensureBackupDir() {
@@ -704,6 +715,7 @@ if (SQLITE_READY) db.serialize(() => {
 });
 
 function pad2(n) { return String(n).padStart(2, '0'); }
+ 
 
 function detectMonthYear(msg){
   const now = new Date(); let m = now.getMonth()+1; let y = now.getFullYear();
@@ -869,9 +881,14 @@ async function simpleBotReplyFull(text){
   if (/(top|xếp hạng).*(năm)/.test(low)) return topYearReply(low)
   if (/(chi phí|breakdown|theo loại)/.test(low)) return expenseBreakdown(low)
   if (/(công nợ|chi tiết công nợ|aging)/.test(low)) return debtsDetail(low)
+  if (/(gán|set|sửa).*(số\s*hđ|invoice)/.test(low)) { const r = await parseSetInvoice(low); if (r) return r }
+  if (/(thiếu|chưa\s*có).*số\s*hđ/.test(low)) { const r = await findMissingInvoice(low); if (r) return r }
   if (/(hđ|hóa đơn|receipt|bill|số hđ|tìm ảnh)/.test(low)) return findReceipt(low)
   if (/(thêm|tạo).*(đơn bán|đơn nhập|bán|nhập)/.test(low)) return parseCreate(low)
   if (/(thêm|tạo).*(chi phí)/.test(low)) { const r = await parseCreateExpense(low); if (r) return r }
+  if (/sửa.*(đơn bán|bán)\s*#?\d+/.test(low)) { const r = await parseUpdateSale(low); if (r) return r }
+  if (/sửa.*(đơn nhập|nhập)\s*#?\d+/.test(low)) { const r = await parseUpdatePurchase(low); if (r) return r }
+  if (/so sánh.*tháng/.test(low)) { const r = await compareMonths(low); if (r) return r }
   if (/(xóa|xoá).*(đơn bán|bán)\s*#?\d+/.test(low)) { const id = Number((low.match(/#?(\d+)/)||[])[1]||0); if (id>0) return { reply:`Xóa đơn bán #${id}?`, actions:[{ type:'function_call', name:'delete_sale', args:{ id }, label:'Xác nhận' }] } }
   if (/(xóa|xoá).*(đơn nhập|nhập)\s*#?\d+/.test(low)) { const id = Number((low.match(/#?(\d+)/)||[])[1]||0); if (id>0) return { reply:`Xóa đơn nhập #${id}?`, actions:[{ type:'function_call', name:'delete_purchase', args:{ id }, label:'Xác nhận' }] } }
   if (/(xóa|xoá).*(chi phí)\s*#?\d+/.test(low)) { const id = Number((low.match(/#?(\d+)/)||[])[1]||0); if (id>0) return { reply:`Xóa chi phí #${id}?`, actions:[{ type:'function_call', name:'delete_expense', args:{ id }, label:'Xác nhận' }] } }
@@ -1082,75 +1099,6 @@ app.post('/sales', rateLimit(60_000, 30, 'sales_post'), requireAuth, (req, res) 
   runInsert(SALES_HAS_TOTAL_AMOUNT || true);
 });
 
-// Bot endpoint
-app.post('/bot', requireAuth, rateLimit(60_000, 30, 'bot'), async (req, res) => {
-  try {
-    const { message } = req.body || {}
-    const low = String(message||'').toLowerCase()
-    if (/(nhắc việc|việc cần làm|cảnh báo)/.test(low)) {
-      const r = await botReminders(req, low)
-      return res.json(r)
-    }
-    const mp = await parseMarkPaid(message)
-    if (mp) return res.json(mp)
-    if (OPENAI_API_KEY_RUNTIME) {
-      const rAi = await chatgptReply(message)
-      if (rAi && ((Array.isArray(rAi.actions) && rAi.actions.length>0) || (rAi.reply && rAi.reply.trim() && rAi.reply.trim()!=='OK'))) return res.json(rAi)
-    }
-    const r = await simpleBotReplyFull(message)
-    res.json(r)
-  } catch (e) {
-    res.status(500).json({ message: 'Bot error', detail: String(e?.message||'') })
-  }
-})
-app.get('/admin/bot/config', requireAdmin, (req, res) => {
-  res.json({ openai_enabled: !!OPENAI_API_KEY_RUNTIME, model: OPENAI_MODEL_RUNTIME })
-})
-app.post('/admin/bot/config', requireAdmin, (req, res) => {
-  const { openai_api_key, model, enabled } = req.body || {}
-  if (enabled === false) OPENAI_API_KEY_RUNTIME = ''
-  if (typeof openai_api_key === 'string') OPENAI_API_KEY_RUNTIME = openai_api_key
-  if (typeof model === 'string' && model) OPENAI_MODEL_RUNTIME = model
-  res.json({ ok: true, openai_enabled: !!OPENAI_API_KEY_RUNTIME, model: OPENAI_MODEL_RUNTIME })
-})
-app.post('/admin/bot/test', requireAdmin, async (req, res) => {
-  const { message } = req.body || {}
-  const r = await chatgptReply(message)
-  res.json(r || { reply:'AI chưa bật', actions:[] })
-})
-try { app.use('/bot', require('./routes/bot')) } catch {}
-
-app.get('/bot/schema', requireAuth, (req, res) => {
-  const schema = {
-    actions: [
-      { type: 'navigate', fields: ['tab'] },
-      { type: 'open_url', fields: ['path'] },
-      { type: 'prefill_sales', fields: ['payload'] },
-      { type: 'prefill_purchases', fields: ['payload'] },
-      { type: 'prefill_expenses', fields: ['payload'] },
-      { type: 'post_api', fields: ['method','path','payload'] },
-      { type: 'function_call', fields: ['name','args'] }
-    ],
-    functions: [
-      { name:'create_sale', args:['sale_date','customer_name','tea_type','price_per_kg','weight','payment_status','ticket_name','invoice_no','contract','issued_by','export_type','country'] },
-      { name:'update_sale', args:['id','sale_date','customer_name','tea_type','price_per_kg','weight','payment_status','ticket_name','invoice_no','contract','created_by','issued_by','export_type','country','receipt_data','receipt_name'] },
-      { name:'delete_sale', args:['id'] },
-      { name:'mark_sale_paid', args:['id','receipt_data','receipt_name'] },
-      { name:'create_purchase', args:['purchase_date','supplier_name','weight','unit_price','payment_status','water_percent','net_weight','ticket_name','invoice_no','weigh_ticket_code','vehicle_plate'] },
-      { name:'update_purchase', args:['id','purchase_date','supplier_name','weight','unit_price','payment_status','water_percent','net_weight','ticket_name','invoice_no','weigh_ticket_code','vehicle_plate','receipt_data','receipt_name'] },
-      { name:'delete_purchase', args:['id'] },
-      { name:'mark_purchase_paid', args:['id','receipt_data','receipt_name'] },
-      { name:'create_expense', args:['expense_date','description','amount','category','receipt_data','receipt_name'] },
-      { name:'update_expense', args:['id','expense_date','description','amount','category','receipt_data','receipt_name'] },
-      { name:'delete_expense', args:['id'] },
-      { name:'find_receipts', args:['q','type','month','year'] },
-      { name:'kpi_month', args:['month','year'] },
-      { name:'top_customers_month', args:['month','year'] },
-      { name:'top_suppliers_month', args:['month','year'] }
-    ]
-  }
-  res.json(schema)
-})
 
 app.put('/sales/:id', rateLimit(60_000, 60, 'sales_put'), requireAuth, (req, res) => {
   const id = req.params.id;
@@ -1743,7 +1691,7 @@ app.put('/finished-stock/:id', requireAuth, (req, res) => {
 
 // Unified receipts list
 app.get('/receipts', requireAuth, async (req, res) => {
-  const { month, year, type } = req.query || {};
+  const { month, year, type, missing } = req.query || {};
   const mStr = month ? String(month).padStart(2,'0') : null;
   const yStr = year ? String(year) : null;
   const wantType = ['sales','purchases','expenses'].includes(String(type)) ? String(type) : 'all';
@@ -1804,17 +1752,21 @@ app.get('/receipts', requireAuth, async (req, res) => {
     const salesCols = await getColInfo('sales');
     const purchCols = await getColInfo('purchases');
     const has = (cols, name) => cols.some(c => c.name === name);
-    const salesInvExpr = has(salesCols,'invoice_no') ? (has(salesCols,'ticket_name') ? 'COALESCE(invoice_no, ticket_name)' : 'invoice_no') : (has(salesCols,'ticket_name') ? 'ticket_name' : 'NULL');
-    const purchInvExpr = has(purchCols,'invoice_no') ? (has(purchCols,'ticket_name') || has(purchCols,'weigh_ticket_code') ? 'COALESCE(invoice_no, ticket_name, weigh_ticket_code)' : 'invoice_no') : (has(purchCols,'ticket_name') || has(purchCols,'weigh_ticket_code') ? 'COALESCE(ticket_name, weigh_ticket_code)' : 'NULL');
+    const salesInvExprRaw = has(salesCols,'invoice_no') ? (has(salesCols,'ticket_name') ? 'COALESCE(invoice_no, ticket_name)' : 'invoice_no') : (has(salesCols,'ticket_name') ? 'ticket_name' : 'NULL');
+    const purchInvExprRaw = has(purchCols,'invoice_no') ? (has(purchCols,'ticket_name') || has(purchCols,'weigh_ticket_code') ? 'COALESCE(invoice_no, ticket_name, weigh_ticket_code)' : 'invoice_no') : (has(purchCols,'ticket_name') || has(purchCols,'weigh_ticket_code') ? 'COALESCE(ticket_name, weigh_ticket_code)' : 'NULL');
+    const salesInvExpr = salesInvExprRaw;
+    const purchInvExpr = purchInvExprRaw;
     let sql = '';
     if (wantType==='sales') {
       clauses.length = 0; params.length = 0;
       clauses.push('sales.receipt_path IS NOT NULL'); addDate('sale_date');
+      if (missing) clauses.push("(invoice_no IS NULL OR TRIM(COALESCE(invoice_no,'')) = '')")
       sql = `SELECT 'sales' AS type, id, sale_date AS d, owner, ${salesInvExpr} AS invoice_no FROM sales ${clauses.length?'WHERE '+clauses.join(' AND '):''}${ownerClause('sales')} ORDER BY d DESC, id DESC LIMIT ${limit}`;
       params.push(...ownerParam);
     } else if (wantType==='purchases') {
       clauses.length = 0; params.length = 0;
       clauses.push('purchases.receipt_path IS NOT NULL'); addDate('purchase_date');
+      if (missing) clauses.push("(invoice_no IS NULL OR TRIM(COALESCE(invoice_no,'')) = '')")
       sql = `SELECT 'purchases' AS type, id, purchase_date AS d, owner, ${purchInvExpr} AS invoice_no FROM purchases ${clauses.length?'WHERE '+clauses.join(' AND '):''}${ownerClause('purchases')} ORDER BY d DESC, id DESC LIMIT ${limit}`;
       params.push(...ownerParam);
     } else if (wantType==='expenses') {
@@ -1835,6 +1787,7 @@ app.get('/receipts', requireAuth, async (req, res) => {
         SELECT 'expenses' AS type, id, expense_date AS d, owner, NULL AS invoice_no FROM expenses ${expensesWhere.length?'WHERE '+expensesWhere.join(' AND '):''}
         ORDER BY d DESC, id DESC LIMIT ${limit}
       `;
+      if (missing) { sql = sql.replace('FROM sales', "FROM sales WHERE (invoice_no IS NULL OR TRIM(COALESCE(invoice_no,'')) = '')").replace('FROM purchases', "FROM purchases WHERE (invoice_no IS NULL OR TRIM(COALESCE(invoice_no,'')) = '')") }
     }
     db.all(sql, params, (err, rows) => {
       if (err) return res.status(500).json({ message: 'DB error', detail: err.message });
@@ -1845,6 +1798,66 @@ app.get('/receipts', requireAuth, async (req, res) => {
     res.status(500).json({ message: 'DB error', detail: e.message })
   }
 });
+
+// Audit logs viewer
+app.get('/admin/audit-logs', requireAdmin, (req, res) => {
+  const { limit = 100, offset = 0, table, action, user, record_id } = req.query||{}
+  if (!SQLITE_READY) return res.status(500).json({ message:'DB error', detail:'SQLite disabled' })
+  const where = []
+  const params = []
+  if (table) { where.push('table_name = ?'); params.push(String(table)) }
+  if (action) { where.push('action = ?'); params.push(String(action)) }
+  if (user) { where.push('user = ?'); params.push(String(user)) }
+  if (record_id) { where.push('record_id = ?'); params.push(Number(record_id)) }
+  const sql = `SELECT id, at, user, action, table_name, record_id, before, after FROM audit_logs ${where.length?('WHERE '+where.join(' AND ')):''} ORDER BY id DESC LIMIT ? OFFSET ?`
+  db.all(sql, [...params, Number(limit), Number(offset)], (err, rows) => {
+    if (err) return res.status(500).json({ message:'DB error', detail:err.message })
+    res.json(rows||[])
+  })
+})
+
+// CSV import/export templates
+app.get('/admin/import/template', requireAdmin, (req, res) => {
+  const type = String((req.query&&req.query.type)||'').toLowerCase()
+  let headers = []
+  if (type==='sales') headers = ['sale_date','customer_name','tea_type','price_per_kg','weight','payment_status','ticket_name','invoice_no','contract','issued_by','export_type','country']
+  else if (type==='purchases') headers = ['purchase_date','supplier_name','weight','unit_price','payment_status','water_percent','net_weight','ticket_name','invoice_no','weigh_ticket_code','vehicle_plate']
+  else if (type==='expenses') headers = ['expense_date','description','amount','category']
+  else return res.status(400).json({ message:'Unknown type', detail:'type must be sales|purchases|expenses' })
+  const csv = '\uFEFF'+headers.join(',')+'\n'
+  res.setHeader('Content-Type','text/csv; charset=utf-8')
+  res.setHeader('Content-Disposition',`attachment; filename="template_${type}.csv"`)
+  res.send(csv)
+})
+
+app.post('/admin/import', requireAdmin, (req, res) => {
+  const type = String((req.body&&req.body.type)||'').toLowerCase()
+  const rows = Array.isArray(req.body&&req.body.rows) ? req.body.rows : []
+  if (!rows.length) return res.status(400).json({ message:'No rows' })
+  if (!SQLITE_READY) return res.status(500).json({ message:'DB error', detail:'SQLite disabled' })
+  const results = { inserted: 0, failed: 0, errors: [] }
+  const runBatch = (sql, params) => new Promise((resolve) => db.run(sql, params, function(err){ if(err){ results.failed++; results.errors.push(String(err.message||'error')) } else { results.inserted++ } resolve() }))
+  const go = async () => {
+    for (const r of rows) {
+      try {
+        if (type==='sales') {
+          const sale_date=r.sale_date, customer_name=r.customer_name||'', tea_type=r.tea_type||'', price_per_kg=Number(r.price_per_kg||0), weight=Number(r.weight||0), payment_status=r.payment_status||'pending'
+          await runBatch(`INSERT INTO sales (sale_date, customer_name, tea_type, price_per_kg, weight, payment_status, ticket_name, invoice_no, contract, created_by, owner, issued_by, export_type, country) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [sale_date, customer_name, tea_type, price_per_kg, weight, payment_status, r.ticket_name||null, r.invoice_no||null, r.contract||null, String(req.user?.username||''), String(req.user?.username||''), r.issued_by||null, r.export_type||null, r.country||null])
+        } else if (type==='purchases') {
+          const purchase_date=r.purchase_date, supplier_name=r.supplier_name||'', weight=Number(r.weight||0), unit_price=Number(r.unit_price||0), payment_status=r.payment_status||'pending'
+          await runBatch(`INSERT INTO purchases (purchase_date, supplier_name, weight, unit_price, payment_status, water_percent, net_weight, ticket_name, invoice_no, weigh_ticket_code, vehicle_plate, owner) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, [purchase_date, supplier_name, weight, unit_price, payment_status, r.water_percent!=null?Number(r.water_percent):null, r.net_weight!=null?Number(r.net_weight):null, r.ticket_name||null, r.invoice_no||null, r.weigh_ticket_code||null, r.vehicle_plate||null, String(req.user?.username||'')])
+        } else if (type==='expenses') {
+          const expense_date=r.expense_date, description=r.description||'', amount=Number(r.amount||0), category=r.category||null
+          await runBatch(`INSERT INTO expenses (expense_date, description, amount, category, owner) VALUES (?,?,?,?,?)`, [expense_date, description, amount, category, String(req.user?.username||'')])
+        } else {
+          results.failed++; results.errors.push('Unknown type')
+        }
+      } catch (e) { results.failed++; results.errors.push(String(e.message||'error')) }
+    }
+    res.json(results)
+  }
+  go()
+})
 
 app.delete('/finished-stock/:id', requireAuth, (req, res) => {
   if (!(hasRole(req, 'admin') || hasRole(req, 'warehouse'))) return res.status(403).json({ message: 'Forbidden: warehouse/admin required' })
@@ -3345,4 +3358,76 @@ async function findByAmount(msg){
     }))
   }
   return { reply:'Cần chỉ rõ Bán hay Nhập. Ví dụ: "đơn bán > 20 triệu tháng 11"', actions:[] }
+}
+async function parseUpdateSale(s){
+  const m = s.match(/#?(\d+)/); const id = m ? Number(m[1]) : 0; if (!id) return null
+  const priceM = s.match(/giá\s*\/kg\s*(\d+[\.,]?\d*)\s*(k|nghìn|ngàn|vnd|đ|vnđ)?/i)
+  const weightM = s.match(/cân\s*(\d+[\.,]?\d*)/i)
+  const custM = s.match(/khách\s*hàng\s+([a-zA-Z0-9À-ỹ\s]+)/i)
+  const teaM = s.match(/loại\s+([a-zA-Z0-9À-ỹ\s]+)/i)
+  const payload = { id }
+  if (priceM) { const val = Number(String(priceM[1]).replace(',','.')); const scale = /k|nghìn|ngàn/i.test(priceM[2]||'') ? 1000 : 1; payload.price_per_kg = val*scale }
+  if (weightM) { payload.weight = Number(String(weightM[1]).replace(',','.')) }
+  if (custM) { payload.customer_name = custM[1].trim() }
+  if (teaM) { payload.tea_type = teaM[1].trim() }
+  if (Object.keys(payload).length<=1) return null
+  return { reply:`Sửa đơn bán #${id}?`, actions:[{ type:'function_call', name:'update_sale', args: payload, label:'Xác nhận sửa' }] }
+}
+async function parseUpdatePurchase(s){
+  const m = s.match(/#?(\d+)/); const id = m ? Number(m[1]) : 0; if (!id) return null
+  const priceM = s.match(/(đơn\s*giá|giá)\s*\/kg\s*(\d+[\.,]?\d*)\s*(k|nghìn|ngàn|vnd|đ|vnđ)?/i)
+  const weightM = s.match(/cân\s*(\d+[\.,]?\d*)/i)
+  const supM = s.match(/(ncc|nhà\s*cung\s*cấp)\s+([a-zA-Z0-9À-ỹ\s]+)/i)
+  const payload = { id }
+  if (priceM) { const val = Number(String(priceM[2]).replace(',','.')); const scale = /k|nghìn|ngàn/i.test(priceM[3]||'') ? 1000 : 1; payload.unit_price = val*scale }
+  if (weightM) { payload.weight = Number(String(weightM[1]).replace(',','.')) }
+  if (supM) { payload.supplier_name = supM[2].trim() }
+  if (Object.keys(payload).length<=1) return null
+  return { reply:`Sửa đơn nhập #${id}?`, actions:[{ type:'function_call', name:'update_purchase', args: payload, label:'Xác nhận sửa' }] }
+}
+async function parseSetInvoice(s){
+  const invM = s.match(/(số\s*hđ|invoice)\s*([a-zA-Z0-9\-\/_]+)/i)
+  const idM = s.match(/#?(\d+)/)
+  if (!invM || !idM) return null
+  const invoice_no = invM[2]
+  const id = Number(idM[1])
+  if (/đơn\s*bán|bán/.test(s.toLowerCase())) return { reply:`Gán Số HĐ ${invoice_no} cho đơn bán #${id}?`, actions:[{ type:'function_call', name:'update_sale', args:{ id, invoice_no }, label:'Xác nhận' }] }
+  if (/đơn\s*nhập|nhập/.test(s.toLowerCase())) return { reply:`Gán Số HĐ ${invoice_no} cho đơn nhập #${id}?`, actions:[{ type:'function_call', name:'update_purchase', args:{ id, invoice_no }, label:'Xác nhận' }] }
+  return null
+}
+async function findMissingInvoice(s){
+  const mM = s.match(/tháng\s*(\d{1,2})/i); const yM = s.match(/năm\s*(\d{4})/i)
+  const m = mM ? String(mM[1]).padStart(2,'0') : null
+  const y = yM ? String(yM[1]) : null
+  const salesRows = await new Promise((resolve)=> db.all(`SELECT id, ticket_name, COALESCE(invoice_no,'') AS invoice_no, sale_date AS d, receipt_path FROM sales WHERE receipt_path IS NOT NULL AND (invoice_no IS NULL OR invoice_no='') ${m?" AND strftime('%m', sale_date)=?":""} ${y?" AND strftime('%Y', sale_date)=?":""} ORDER BY d DESC LIMIT 10`, [m,y].filter(Boolean), (e,r)=> resolve(r||[])))
+  const purchRows = await new Promise((resolve)=> db.all(`SELECT id, ticket_name, COALESCE(invoice_no,'') AS invoice_no, purchase_date AS d, receipt_path FROM purchases WHERE receipt_path IS NOT NULL AND (invoice_no IS NULL OR invoice_no='') ${m?" AND strftime('%m', purchase_date)=?":""} ${y?" AND strftime('%Y', purchase_date)=?":""} ORDER BY d DESC LIMIT 10`, [m,y].filter(Boolean), (e,r)=> resolve(r||[])))
+  const actions = []
+  salesRows.forEach(r => { actions.push({ type:'open_url', path:`/api/sales/${r.id}/receipt`, label:`Ảnh bán #${r.id}` }) })
+  purchRows.forEach(r => { actions.push({ type:'open_url', path:`/api/purchases/${r.id}/receipt`, label:`Ảnh nhập #${r.id}` }) })
+  const reply = `Có ${salesRows.length} ảnh đơn bán và ${purchRows.length} ảnh đơn nhập thiếu Số HĐ${m?` tháng ${Number(m)}`:''}${y?`/${y}`:''}.`
+  return { reply, actions }
+}
+async function compareMonths(s){
+  const mm = s.match(/tháng\s*(\d{1,2}).*vs.*tháng\s*(\d{1,2})/i)
+  const now = new Date(); const y = now.getFullYear();
+  const m1 = mm ? Number(mm[1]) : (now.getMonth()+1)
+  const m2 = mm ? Number(mm[2]) : (m1>1 ? m1-1 : 12)
+  const y2 = (m1>1) ? y : (y-1)
+  const pad2 = (n)=> String(n).padStart(2,'0')
+  const qSales = async (m,y)=> new Promise((resolve)=> db.get(`SELECT COALESCE(SUM(price_per_kg*weight),0) AS s FROM sales WHERE strftime('%m', sale_date)=? AND strftime('%Y', sale_date)=?`, [pad2(m), String(y)], (e,r)=> resolve(Number((r&&r.s)||0))))
+  const qPurch = async (m,y)=> new Promise((resolve)=> db.get(`SELECT COALESCE(SUM(unit_price*COALESCE(net_weight,weight)),0) AS p FROM purchases WHERE strftime('%m', purchase_date)=? AND strftime('%Y', purchase_date)=?`, [pad2(m), String(y)], (e,r)=> resolve(Number((r&&r.p)||0))))
+  const qExp = async (m,y)=> new Promise((resolve)=> db.get(`SELECT COALESCE(SUM(amount),0) AS e FROM expenses WHERE strftime('%m', expense_date)=? AND strftime('%Y', expense_date)=?`, [pad2(m), String(y)], (e,r)=> resolve(Number((r&&r.e)||0))))
+  const [s1,p1,e1] = await Promise.all([qSales(m1,y), qPurch(m1,y), qExp(m1,y)])
+  const [s2,p2,e2] = await Promise.all([qSales(m2,y2), qPurch(m2,y2), qExp(m2,y2)])
+  const l1 = s1 - p1 - e1
+  const l2 = s2 - p2 - e2
+  const diff = (a,b)=> a-b
+  const fmt = (n)=> (Math.round(n)||0).toLocaleString()
+  const reply = `Tháng ${m1}/${y}: Thu ${fmt(s1)}, Chi nhập ${fmt(p1)}, Chi phí ${fmt(e1)}, Lãi ${fmt(l1)}. So với tháng ${m2}/${y2}: Thu ${fmt(diff(s1,s2))}, Chi nhập ${fmt(diff(p1,p2))}, Chi phí ${fmt(diff(e1,e2))}, Lãi ${fmt(diff(l1,l2))}.`
+  const actions = [
+    { type:'navigate', tab:'sales', label:`Mở Thu tháng ${m1}` },
+    { type:'navigate', tab:'purchases', label:`Mở Nhập tháng ${m1}` },
+    { type:'navigate', tab:'expenses', label:`Mở Chi phí tháng ${m1}` }
+  ]
+  return { reply, actions }
 }
