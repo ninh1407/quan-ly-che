@@ -130,6 +130,7 @@ export default function App() {
         <button className="btn" onClick={() => setMenuOpen(true)}>☰ Menu</button>
         <button className="btn" onClick={() => setSettingsOpen(true)}>⚙️ Cài đặt</button>
       </div>
+      <button className="quick-menu" onClick={() => setMenuOpen(true)} aria-label="Menu">☰</button>
       <Breadcrumb tab={tab} />
       <div className="tabs">
           <button className="hamburger-btn" onClick={() => setMenuOpen(true)}>☰ Menu</button>
