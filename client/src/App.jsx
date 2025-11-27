@@ -143,18 +143,30 @@ export default function App() {
       <div className="tabs">
           <button className="btn" onClick={() => setMenuOpen(true)}>☰ Menu</button>
           <button className="btn" onClick={() => setTheme(theme === 'light' ? 'dark' : (theme==='dark' ? 'tea' : (theme==='tea' ? 'wood' : 'light')))}>{theme === 'light' ? '🌙 Tối' : (theme==='dark' ? '🍵 Nâu – Xanh lá' : (theme==='tea' ? '🪵 Gỗ truyền thống' : '☀️ Sáng'))}</button>
-          <details className="dropdown" style={{ marginLeft: 'auto' }}>
-            <summary className="btn avatar"><span className="circle">{(localStorage.getItem('username')||'N')[0].toUpperCase()}</span> {(localStorage.getItem('username')||'Người dùng')} ▾</summary>
-          <div className="dropdown-menu">
-            <button className="btn" onClick={() => setAccountOpen(true)}>Tài khoản</button>
-            <button className="btn" onClick={() => setNotifOpen(true)}>Thông báo</button>
-            <button className="btn" onClick={() => setSettingsOpen(true)}>Cài đặt</button>
-            {installEvt && <button className="btn" onClick={installApp}>Cài đặt App</button>}
-            {isIOS && <button className="btn" onClick={() => setIosGuideOpen(true)}>Cài trên iPhone</button>}
-            <button className="btn" onClick={() => setTab('changePwd')}>Đổi mật khẩu</button>
-            <button className="btn" onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('role'); setAuthed(false) }}>Đăng xuất</button>
-          </div>
-          </details>
+          {isMobile ? (
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginLeft:'auto' }}>
+              <button className="btn" onClick={() => setAccountOpen(true)}>Tài khoản</button>
+              <button className="btn" onClick={() => setNotifOpen(true)}>Thông báo</button>
+              <button className="btn" onClick={() => setSettingsOpen(true)}>Cài đặt</button>
+              {installEvt && <button className="btn" onClick={installApp}>Cài đặt App</button>}
+              {isIOS && <button className="btn" onClick={() => setIosGuideOpen(true)}>Cài trên iPhone</button>}
+              <button className="btn" onClick={() => setTab('changePwd')}>Đổi mật khẩu</button>
+              <button className="btn" onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('role'); setAuthed(false) }}>Đăng xuất</button>
+            </div>
+          ) : (
+            <details className="dropdown" style={{ marginLeft: 'auto' }}>
+              <summary className="btn avatar"><span className="circle">{(localStorage.getItem('username')||'N')[0].toUpperCase()}</span> {(localStorage.getItem('username')||'Người dùng')} ▾</summary>
+              <div className="dropdown-menu">
+                <button className="btn" onClick={() => setAccountOpen(true)}>Tài khoản</button>
+                <button className="btn" onClick={() => setNotifOpen(true)}>Thông báo</button>
+                <button className="btn" onClick={() => setSettingsOpen(true)}>Cài đặt</button>
+                {installEvt && <button className="btn" onClick={installApp}>Cài đặt App</button>}
+                {isIOS && <button className="btn" onClick={() => setIosGuideOpen(true)}>Cài trên iPhone</button>}
+                <button className="btn" onClick={() => setTab('changePwd')}>Đổi mật khẩu</button>
+                <button className="btn" onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('role'); setAuthed(false) }}>Đăng xuất</button>
+              </div>
+            </details>
+          )}
       </div>
       {menuOpen && (
         <div className="drawer open" onClick={() => setMenuOpen(false)}>
