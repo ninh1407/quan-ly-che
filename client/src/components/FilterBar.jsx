@@ -1,4 +1,4 @@
-import React from 'react'
+import * as React from 'react'
 
 export default function FilterBar({ month, year, setMonth, setYear, selectedDay, setSelectedDay }) {
   const yearOptions = Array.from({length:5},(_,i)=> new Date().getFullYear()-2+i)

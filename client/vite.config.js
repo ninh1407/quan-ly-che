@@ -1,7 +1,11 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  plugins: [react()],
-  server: { port: 8080, host: true }
+  server: { port: 8080, host: true },
+  esbuild: {
+    jsx: 'classic',
+    jsxFactory: 'React.createElement',
+    jsxFragment: 'React.Fragment',
+    jsxInject: `import * as React from 'react'`
+  }
 })
