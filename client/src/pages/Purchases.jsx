@@ -382,17 +382,7 @@ export default function Purchases() {
             </div>
           </div>
         </div>
-        <div className="card" style={{ marginTop:8, padding:12 }} onDragOver={(e)=> e.preventDefault()} onDrop={async (e)=>{
-          e.preventDefault(); const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(!f){return}
-          if(!selected.length){ setError('Hãy chọn một dòng để đính kèm ảnh rồi thả ảnh vào'); return }
-          const id=selected[0]; if(f.size>5*1024*1024){ setError('Ảnh phải nhỏ hơn 5MB'); return }
-          try{
-            if(f.size>1024*1024){ const out=await compressImage(f); setPayModal({ id, file:{ name: out.name, data: out.data }, error:'' }) }
-            else { const r=new FileReader(); r.onload=()=> setPayModal({ id, file:{ name:f.name, data:r.result }, error:'' }); r.readAsDataURL(f) }
-          }catch{ setError('Nén ảnh lỗi') }
-        }}>
-          Kéo thả ảnh vào đây để đính kèm cho dòng đã chọn
-        </div>
+        
         {hint && <div className="muted" style={{ gridColumn:'1/-1', marginTop:8 }}>{hint}</div>}
         {editingId && <button className="btn" type="button" onClick={() => { setEditingId(null); setForm({ purchase_date: '', supplier_name: '', ticket_name: '', weigh_ticket_code: '', vehicle_plate: '', weight: '', water_percent: '', unit_price: '', payment_status: 'pending' }); }}>Hủy</button>}
       </form>
@@ -556,11 +546,7 @@ export default function Purchases() {
             <button className="btn" onClick={()=> setViewer({ open:false, url:'', scale:1, img:true })}>Đóng</button>
           </div>
           <div style={{ marginTop:8, border:'1px solid #e8dac2', borderRadius:12, overflow:'auto', maxHeight:'70vh' }}>
-            {viewer.img ? (
-              <img src={viewer.url} style={{ transform:`scale(${viewer.scale})`, transformOrigin:'center top', display:'block', maxWidth:'100%' }} onError={()=> setViewer(s=> ({ ...s, img:false }))} />
-            ) : (
-              <iframe title="viewer" src={viewer.url} style={{ width:'100%', height:'70vh', border:0 }} />
-            )}
+            <img src={viewer.url} style={{ transform:`scale(${viewer.scale})`, transformOrigin:'center top', display:'block', maxWidth:'100%' }} onError={()=> { try { window.open(viewer.url, '_blank') } catch {} setViewer({ open:false, url:'', scale:1, img:true }) }} />
           </div>
         </div>
       </div>

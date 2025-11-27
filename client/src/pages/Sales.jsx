@@ -441,14 +441,7 @@ export default function Sales() {
             </div>
           </div>
         </div>
-        <div className="card" style={{ marginTop:8, padding:12 }} onDragOver={(e)=> e.preventDefault()} onDrop={(e)=>{
-          e.preventDefault(); const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(!f){return}
-          if(!selected.length){ setError('Hãy chọn một dòng để đính kèm tệp rồi thả vào'); return }
-          const id=selected[0]; if(f.size>5*1024*1024){ setError('Tệp phải nhỏ hơn 5MB'); return }
-          const reader=new FileReader(); reader.onload=()=> setPayModal({ id, file:{ name:f.name, data: reader.result }, error:'' }); reader.readAsDataURL(f)
-        }}>
-          Kéo thả ảnh/PDF vào đây để đính kèm cho dòng đã chọn
-        </div>
+        
         {hint && <div className="muted" style={{ gridColumn:'1/-1', marginTop:8 }}>{hint}</div>}
         {editingId && <button className="btn" type="button" onClick={() => { setEditingId(null); setForm({ sale_date: '', customer_name: '', tea_type: '', price_per_kg: '', weight: '', payment_status: 'pending' }); }}>Hủy</button>}
       </form>
@@ -618,11 +611,7 @@ export default function Sales() {
             <button className="btn" onClick={()=> setViewer({ open:false, url:'', scale:1, img:true })}>Đóng</button>
           </div>
           <div style={{ marginTop:8, border:'1px solid #e8dac2', borderRadius:12, overflow:'auto', maxHeight:'70vh' }}>
-            {viewer.img ? (
-              <img src={viewer.url} style={{ transform:`scale(${viewer.scale})`, transformOrigin:'center top', display:'block', maxWidth:'100%' }} onError={()=> setViewer(s=> ({ ...s, img:false }))} />
-            ) : (
-              <iframe title="viewer" src={viewer.url} style={{ width:'100%', height:'70vh', border:0 }} />
-            )}
+            <img src={viewer.url} style={{ transform:`scale(${viewer.scale})`, transformOrigin:'center top', display:'block', maxWidth:'100%' }} onError={()=> { try { window.open(viewer.url, '_blank') } catch {} setViewer({ open:false, url:'', scale:1, img:true }) }} />
           </div>
         </div>
       </div>

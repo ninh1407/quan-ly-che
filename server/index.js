@@ -1173,6 +1173,18 @@ app.put('/sales/:id', rateLimit(60_000, 60, 'sales_put'), requireAuth, (req, res
     }
     if (payment_status === 'paid') { upd.paid_by = String(req.user?.username || '') }
     const doUpdate = () => col.updateOne({ id: Number(id) }, { $set: upd }, { upsert: true }).then(() => { const changes = { ...upd }; delete changes.receipt_data; auditLog('sales', id, 'update', req, changes); res.json({ changed: 1 }) }).catch(e => res.status(500).json({ message: 'DB error', detail: e.message }));
+    if (payment_status === 'pending') {
+      return col.findOne({ id: Number(id) }).then(prev => {
+        const rel = prev?.receipt_path; if (rel) { try { const safe = String(rel).replace(/^\//,''); const abs = path.join(__dirname, safe); if (fs.existsSync(abs)) fs.unlinkSync(abs) } catch {} }
+        upd.receipt_path = null; upd.paid_by = null;
+        if (needTotal) {
+          const p = price_per_kg != null ? Number(price_per_kg) : Number(prev?.price_per_kg || 0);
+          const w = weight != null ? Number(weight) : Number(prev?.weight || 0);
+          upd.total_amount = p * w; return doUpdate();
+        }
+        return doUpdate();
+      }).catch(e => res.status(500).json({ message: 'DB error', detail: e.message }));
+    }
     if (needTotal) {
       col.findOne({ id: Number(id) }).then(prev => {
         const p = price_per_kg != null ? Number(price_per_kg) : Number(prev?.price_per_kg || 0);
@@ -1218,8 +1230,7 @@ app.put('/sales/:id', rateLimit(60_000, 60, 'sales_put'), requireAuth, (req, res
   }
   if (!fields.length) return res.status(400).json({ message: 'No fields to update' });
   const sql = `UPDATE sales SET ${fields.join(', ')} WHERE id = ?`;
-  params.push(id);
-  db.run(sql, params, function (err) {
+  const run = () => db.run(sql, params, function (err) {
     if (err) return res.status(500).json({ message: 'DB error', detail: err.message });
     if (MONGO_READY) {
       const col = mongoDb.collection('sales');
@@ -1264,6 +1275,17 @@ app.put('/sales/:id', rateLimit(60_000, 60, 'sales_put'), requireAuth, (req, res
     auditLog('sales', id, 'update', req, changes);
     res.json({ changed: this.changes });
   });
+  if (payment_status === 'pending') {
+    return db.get('SELECT receipt_path FROM sales WHERE id = ?', [Number(id)], (err, row) => {
+      if (!err) { const rel = row?.receipt_path; if (rel) { try { const safe = String(rel).replace(/^\//,''); const abs = path.join(__dirname, safe); if (fs.existsSync(abs)) fs.unlinkSync(abs) } catch {} } }
+      fields.push('receipt_path = NULL');
+      fields.push('paid_by = NULL');
+      params.push(id);
+      return run();
+    })
+  }
+  params.push(id);
+  return run();
   }
   if (!isAdmin && isSeller) {
     return db.get('SELECT payment_status FROM sales WHERE id = ?', [id], (err, row) => {
@@ -1510,6 +1532,24 @@ app.put('/purchases/:id', rateLimit(60_000, 60, 'purchases_put'), requireAuth, (
     }
     if (payment_status === 'paid') { upd.paid_by = String(req.user?.username || '') }
     const doUpdate = () => col.updateOne({ id: Number(id) }, { $set: upd }, { upsert: true }).then(() => { const changes = { ...upd }; delete changes.receipt_data; auditLog('purchases', id, 'update', req, changes); res.json({ changed: 1 }) }).catch(e => res.status(500).json({ message: 'DB error', detail: e.message }));
+    if (payment_status === 'pending') {
+      return col.findOne({ id: Number(id) }).then(prev => {
+        const rel = prev?.receipt_path; if (rel) { try { const safe = String(rel).replace(/^\//,''); const abs = path.join(__dirname, safe); if (fs.existsSync(abs)) fs.unlinkSync(abs) } catch {} }
+        upd.receipt_path = null; upd.paid_by = null;
+        if (needTotal) {
+          const up = unit_price != null ? Number(unit_price) : Number(prev?.unit_price || 0);
+          let nw;
+          if (net_weight != null) nw = Number(net_weight);
+          else {
+            const wv = weight != null ? Number(weight) : Number(prev?.weight || 0);
+            const wp = water_percent != null ? Number(water_percent) : Number(prev?.water_percent || 0);
+            nw = wv * (wp >= 100 ? 0 : (1 - (wp || 0) / 100));
+          }
+          upd.total_cost = up * nw; return doUpdate();
+        }
+        return doUpdate();
+      }).catch(e => res.status(500).json({ message: 'DB error', detail: e.message }));
+    }
     if (needTotal) {
       col.findOne({ id: Number(id) }).then(prev => {
         const up = unit_price != null ? Number(unit_price) : Number(prev?.unit_price || 0);
@@ -1555,8 +1595,7 @@ app.put('/purchases/:id', rateLimit(60_000, 60, 'purchases_put'), requireAuth, (
   if (payment_status === 'paid') { fields.push('paid_by = ?'); params.push(String(req.user?.username || '')) }
   if (!fields.length) return res.status(400).json({ message: 'No fields to update' });
   const sql = `UPDATE purchases SET ${fields.join(', ')} WHERE id = ?`;
-  params.push(id);
-  db.run(sql, params, function (err) {
+  const run = () => db.run(sql, params, function (err) {
     if (err) return res.status(500).json({ message: 'DB error', detail: err.message });
     if (MONGO_READY) {
       const col = mongoDb.collection('purchases');
@@ -1607,6 +1646,17 @@ app.put('/purchases/:id', rateLimit(60_000, 60, 'purchases_put'), requireAuth, (
     auditLog('purchases', id, 'update', req, changes);
     res.json({ changed: this.changes });
   });
+  if (payment_status === 'pending') {
+    return db.get('SELECT receipt_path FROM purchases WHERE id = ?', [Number(id)], (err, row) => {
+      if (!err) { const rel = row?.receipt_path; if (rel) { try { const safe = String(rel).replace(/^\//,''); const abs = path.join(__dirname, safe); if (fs.existsSync(abs)) fs.unlinkSync(abs) } catch {} } }
+      fields.push('receipt_path = NULL');
+      fields.push('paid_by = NULL');
+      params.push(id);
+      return run();
+    })
+  }
+  params.push(id);
+  return run();
   }
   if (!isAdmin && isWarehouse) {
     return db.get('SELECT purchase_date FROM purchases WHERE id = ?', [id], (err, row) => {

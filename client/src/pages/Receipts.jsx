@@ -114,11 +114,7 @@ export default function Receipts() {
             <button className="btn" onClick={()=> setViewer({ open:false, url:'', scale:1, img:true })}>Đóng</button>
           </div>
           <div style={{ marginTop:8, border:'1px solid #e8dac2', borderRadius:12, overflow:'auto', maxHeight:'70vh' }}>
-            {viewer.img ? (
-              <img src={viewer.url} style={{ transform:`scale(${viewer.scale})`, transformOrigin:'center top', display:'block', maxWidth:'100%' }} onError={()=> setViewer(s=> ({ ...s, img:false }))} />
-            ) : (
-              <iframe title="viewer" src={viewer.url} style={{ width:'100%', height:'70vh', border:0 }} />
-            )}
+            <img src={viewer.url} style={{ transform:`scale(${viewer.scale})`, transformOrigin:'center top', display:'block', maxWidth:'100%' }} onError={()=> { try { window.open(viewer.url, '_blank') } catch {} setViewer({ open:false, url:'', scale:1, img:true }) }} />
           </div>
         </div>
       </div>
