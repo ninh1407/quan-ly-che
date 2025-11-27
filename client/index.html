@@ -23,9 +23,21 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function(){ navigator.serviceWorker.register('/sw.js') })
-      }
+      (async () => {
+        try {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          for (const r of (regs||[])) await r.unregister();
+          if (window.caches && window.caches.keys) {
+            const ks = await caches.keys();
+            for (const k of ks) await caches.delete(k);
+          }
+        } catch {}
+        try {
+          if (localStorage.getItem('sw') === 'on' && 'serviceWorker' in navigator) {
+            await navigator.serviceWorker.register('/sw.js')
+          }
+        } catch {}
+      })();
     </script>
   </body>
 </html>
