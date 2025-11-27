@@ -139,16 +139,10 @@ export default function App() {
   return (
       <div className="container">
       <h1 className="glass">Quản lý Chè</h1>
-      <div className="mobile-toolbar">
-        <button className="btn" onClick={() => setMenuOpen(true)}>☰ Menu</button>
-        <button className="btn" onClick={() => setSettingsOpen(true)}>⚙️ Cài đặt</button>
-      </div>
-      <button className="quick-menu" onClick={() => setMenuOpen(true)} aria-label="Menu">☰</button>
-      <button className="quick-settings" onClick={() => setSettingsOpen(true)} aria-label="Cài đặt">⚙️</button>
       <Breadcrumb tab={tab} />
       <div className="tabs">
-          <button className="btn primary mobile-only" onClick={() => setMenuOpen(true)}>☰ Menu</button>
-          <button className="hamburger-btn" onClick={() => setMenuOpen(true)}>☰ Menu</button>
+          <button className="btn" onClick={() => setMenuOpen(true)}>☰ Menu</button>
+          <button className="btn" onClick={() => setSettingsOpen(true)}>⚙️ Cài đặt</button>
           <button className="btn" onClick={() => setTheme(theme === 'light' ? 'dark' : (theme==='dark' ? 'tea' : (theme==='tea' ? 'wood' : 'light')))}>{theme === 'light' ? '🌙 Tối' : (theme==='dark' ? '🍵 Nâu – Xanh lá' : (theme==='tea' ? '🪵 Gỗ truyền thống' : '☀️ Sáng'))}</button>
           <button className="btn" onClick={() => setSettingsOpen(true)}>⚙️ Cài đặt</button>
           <details className="dropdown" style={{ marginLeft: 'auto' }}>
