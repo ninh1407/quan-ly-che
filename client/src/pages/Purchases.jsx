@@ -261,6 +261,7 @@ export default function Purchases() {
   };
 
   return (<>
+    <div className="tea-form-container">
     <div className="card">
       <h2>Nhập chè</h2>
       <div className="section-bar">
@@ -376,7 +377,7 @@ export default function Purchases() {
               </select>
             </div>
             <div>
-              <div className="total-money">💰 Thành tiền dự tính: {totalPreview.toLocaleString()} đ</div>
+              <div className="calc-box">💰 Giá trị lô: {totalPreview.toLocaleString()} đ</div>
               {error && <div className="error">{error}</div>}
               <button className="submit" type="submit">{editingId ? 'Lưu chỉnh sửa' : 'Thêm giao dịch nhập'}</button>
             </div>
@@ -530,9 +531,15 @@ export default function Purchases() {
                 } catch (e) { setPayModal(s=>({ ...s, error: e?.response?.data?.message || 'Cập nhật lỗi' })) }
               }}>Xác nhận</button>
             </div>
+            {payModal.file && String(payModal.file.data||'').startsWith('data:image/') && (
+              <div className="preview" style={{ marginTop:8 }}>
+                <img alt="preview" src={payModal.file.data} />
+              </div>
+            )}
           </div>
         </div>
       )}
+    </div>
     </div>
     {viewer.open && (
       <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.6)', display:'flex', alignItems:'center', justifyContent:'center' }}>

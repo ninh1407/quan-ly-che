@@ -304,6 +304,7 @@ export default function Sales() {
   };
 
   return (<>
+    <div className="tea-form-container">
     <div className="card">
       <h2>Bán chè</h2>
       <div className="section-bar">
@@ -420,8 +421,7 @@ export default function Sales() {
               <input className="highlight" type="number" min="0.001" step="0.001" value={form.weight} onChange={(e) => change('weight', e.target.value)} />
             </div>
             <div>
-              <div className="total-money">💰 Thành tiền dự tính: {totalPreview.toLocaleString()} đ</div>
-              <div className="muted">Lợi nhuận ước tính: {profitPreview.toLocaleString()}</div>
+              <div className="calc-box">💰 Giá trị lô: {totalPreview.toLocaleString()} đ • Lợi nhuận ước tính: {profitPreview.toLocaleString()} đ</div>
             </div>
           </div>
         </div>
@@ -595,9 +595,15 @@ export default function Sales() {
                 } catch (e) { setPayModal(s=>({ ...s, error: e?.response?.data?.message || 'Cập nhật lỗi' })) }
               }}>Xác nhận</button>
             </div>
+            {payModal.file && String(payModal.file.data||'').startsWith('data:image/') && (
+              <div className="preview" style={{ marginTop:8 }}>
+                <img alt="preview" src={payModal.file.data} />
+              </div>
+            )}
           </div>
         </div>
       )}
+    </div>
     </div>
     {viewer.open && (
       <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.6)', display:'flex', alignItems:'center', justifyContent:'center' }}>
