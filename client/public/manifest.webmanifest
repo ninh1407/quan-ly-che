@@ -1,0 +1,13 @@
+{
+  "name": "Quản lý Chè",
+  "short_name": "Quản lý Chè",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f1e6",
+  "theme_color": "#8a5a2f",
+  "icons": [
+    { "src": "/dong-son.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "/dong-son.png", "type": "image/png", "sizes": "512x512" }
+  ]
+}

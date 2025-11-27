@@ -2,6 +2,17 @@ import React, { useEffect, useMemo, useState } from 'react'
 import api from '../api.js'
 
 const fmtMoney = (v) => (Number(v) || 0).toLocaleString('vi-VN')
+const parseMoneyInput = (s) => {
+  const raw = String(s || '').toLowerCase();
+  const mult = /k|nghìn|ngàn/.test(raw) ? 1000 : /tr|triệu|m/.test(raw) ? 1_000_000 : 1;
+  const digits = raw.replace(/[^\d]/g, '');
+  const val = digits ? Number(digits) : 0;
+  return val * mult;
+}
+const formatMoneyInput = (s) => {
+  const v = parseMoneyInput(s);
+  return v ? v.toLocaleString('vi-VN') : '';
+}
 
 function useMonthYear() {
   const now = new Date()
@@ -40,7 +51,7 @@ export default function FinishedStock() {
 
   const submit = async () => {
     try {
-      const payload = { ...form, weight: Number(form.weight), unit_cost: Number(form.unit_cost) }
+      const payload = { ...form, weight: Number(form.weight), unit_cost: parseMoneyInput(form.unit_cost) }
       if (!payload.entry_date) payload.entry_date = `${year}-${String(month).padStart(2,'0')}-01`
       await api.post('/finished-stock', payload)
       setForm({ entry_date: '', tea_type: '', weight: '', unit_cost: '', note: '' })
@@ -57,7 +68,7 @@ export default function FinishedStock() {
   }
 
   const totalPreview = (() => {
-    const w = Number(form.weight||0); const c = Number(form.unit_cost||0); return w*c || 0
+    const w = Number(form.weight||0); const c = parseMoneyInput(form.unit_cost||0); return w*c || 0
   })()
 
   return (
@@ -109,7 +120,7 @@ export default function FinishedStock() {
             </div>
             <div>
               <label>Giá vốn (đ/kg)</label>
-              <input type="number" min="0" step="1" value={form.unit_cost} onChange={(e)=> setForm({ ...form, unit_cost: e.target.value })} />
+              <input placeholder="vd: 100k" value={form.unit_cost} onChange={(e)=> setForm({ ...form, unit_cost: formatMoneyInput(e.target.value) })} />
             </div>
             <div>
               <div className="total-money">💰 Tổng vốn dự tính: {fmtMoney(totalPreview)} đ</div>

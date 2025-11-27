@@ -30,6 +30,9 @@ export default function App() {
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifs, setNotifs] = useState([])
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [installEvt, setInstallEvt] = useState(null)
+  const [iosGuideOpen, setIosGuideOpen] = useState(false)
+  const [isIOS, setIsIOS] = useState(false)
   const [badges, setBadges] = useState({ sales: 0, purchases: 0 })
   const rolesRaw = (() => { try { const r = JSON.parse(localStorage.getItem('roles')||'null'); if (Array.isArray(r)) return r; } catch {} const s = (localStorage.getItem('role')||'user'); return String(s).split(',').map(x=>x.trim()).filter(Boolean) })()
   const hasRole = (name) => rolesRaw.includes(name)
@@ -50,6 +53,24 @@ export default function App() {
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
   }, [])
+  React.useEffect(() => {
+    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallEvt(e) })
+  }, [])
+  React.useEffect(() => {
+    try {
+      const ua = navigator.userAgent || ''
+      const isiOS = /iPad|iPhone|iPod/.test(ua) || ((navigator.platform||'')==='MacIntel' && Number(navigator.maxTouchPoints||0)>1)
+      const isSafari = /Safari/i.test(ua) && !/Chrome/i.test(ua)
+      setIsIOS(isiOS && isSafari)
+    } catch {}
+  }, [])
+  const installApp = async () => { try { if (installEvt) { await installEvt.prompt(); setInstallEvt(null) } } catch {} }
+  const notify = async (title, body) => {
+    try {
+      if (Notification.permission !== 'granted') { try { await Notification.requestPermission() } catch {} }
+      if ('serviceWorker' in navigator) { const reg = await navigator.serviceWorker.getRegistration(); reg && reg.active && reg.active.postMessage({ type:'notify', title, body }) }
+    } catch {}
+  }
   React.useEffect(() => { (async () => { try { const r = await api.get('/notifications'); const items = r.data||[]; setNotifs(items); } catch {} })() }, [notifOpen])
   React.useEffect(() => {
     let timer = null
@@ -95,13 +116,15 @@ export default function App() {
           <button className="btn" onClick={() => setTheme(theme === 'light' ? 'dark' : (theme==='dark' ? 'tea' : (theme==='tea' ? 'wood' : 'light')))}>{theme === 'light' ? '🌙 Tối' : (theme==='dark' ? '🍵 Nâu – Xanh lá' : (theme==='tea' ? '🪵 Gỗ truyền thống' : '☀️ Sáng'))}</button>
           <details className="dropdown" style={{ marginLeft: 'auto' }}>
             <summary className="btn avatar"><span className="circle">{(localStorage.getItem('username')||'N')[0].toUpperCase()}</span> {(localStorage.getItem('username')||'Người dùng')} ▾</summary>
-            <div className="dropdown-menu">
-              <button className="btn" onClick={() => setAccountOpen(true)}>Tài khoản</button>
-              <button className="btn" onClick={() => setNotifOpen(true)}>Thông báo</button>
-              <button className="btn" onClick={() => setSettingsOpen(true)}>Cài đặt</button>
-              <button className="btn" onClick={() => setTab('changePwd')}>Đổi mật khẩu</button>
-              <button className="btn" onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('role'); setAuthed(false) }}>Đăng xuất</button>
-            </div>
+          <div className="dropdown-menu">
+            <button className="btn" onClick={() => setAccountOpen(true)}>Tài khoản</button>
+            <button className="btn" onClick={() => setNotifOpen(true)}>Thông báo</button>
+            <button className="btn" onClick={() => setSettingsOpen(true)}>Cài đặt</button>
+            {installEvt && <button className="btn" onClick={installApp}>Cài đặt App</button>}
+            {isIOS && <button className="btn" onClick={() => setIosGuideOpen(true)}>Cài trên iPhone</button>}
+            <button className="btn" onClick={() => setTab('changePwd')}>Đổi mật khẩu</button>
+            <button className="btn" onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('role'); setAuthed(false) }}>Đăng xuất</button>
+          </div>
           </details>
       </div>
       {menuOpen && (
@@ -202,9 +225,33 @@ export default function App() {
                 <button className="btn" style={{ marginLeft:6 }} onClick={() => setTheme('dark')}>Dark</button>
                 <button className="btn" style={{ marginLeft:6 }} onClick={() => setTheme('tea')}>Tea</button>
               </div>
+              <div className="muted">Cài đặt App</div>
+              <div>
+                <button className="btn" disabled={!installEvt} onClick={installApp}>{installEvt ? 'Cài đặt trên màn hình' : 'Đã cài hoặc không hỗ trợ'}</button>
+              </div>
+              <div className="muted">Cài đặt trên iPhone/iPad</div>
+              <div>
+                <button className="btn" disabled={!isIOS} onClick={() => setIosGuideOpen(true)}>{isIOS ? 'Hướng dẫn cài trên iPhone' : 'Mở bằng Safari trên iPhone'}</button>
+              </div>
             </div>
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:12 }}>
               <button className="btn primary" onClick={() => setSettingsOpen(false)}>Đóng</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {iosGuideOpen && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.35)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <div className="card" style={{ width: 420 }}>
+            <div style={{ fontWeight:700, marginBottom:8 }}>Cài trên iPhone/iPad</div>
+            <div className="form">
+              <div className="muted">1) Mở trang bằng Safari</div>
+              <div className="muted">2) Bấm nút Chia sẻ (ô vuông có mũi tên)</div>
+              <div className="muted">3) Chọn “Thêm vào Màn hình chính”</div>
+              <div className="muted">4) Tên: Quản lý Chè → Thêm</div>
+            </div>
+            <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:12 }}>
+              <button className="btn primary" onClick={() => setIosGuideOpen(false)}>Đóng</button>
             </div>
           </div>
         </div>
