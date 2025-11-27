@@ -92,8 +92,12 @@ export default function Receipts() {
                   <td>{r.invoice_no||''}</td>
                   <td>{r.owner||''}</td>
                   <td style={{ display:'flex', gap:6 }}>
-                    <button className="btn" onClick={()=> setViewer({ open:true, url: ep(r.type, r.id), scale:1, img:true })}>Thu phóng</button>
-                    <a className="btn" href={ep(r.type, r.id)} target="_blank" rel="noreferrer">Mở tab</a>
+                    {((r.type==='expenses') || String(r.payment_status||'')==='paid') ? (
+                      <>
+                        <button className="btn" onClick={()=> setViewer({ open:true, url: ep(r.type, r.id), scale:1, img:true })}>Thu phóng</button>
+                        <a className="btn" href={ep(r.type, r.id)} target="_blank" rel="noreferrer">Mở tab</a>
+                      </>
+                    ) : (<span className="muted">Chưa có tệp</span>)}
                   </td>
                 </tr>
               ))}
