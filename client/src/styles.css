@@ -301,14 +301,25 @@ html{scroll-behavior:smooth}
 [data-device="mobile"] .mobile-toolbar select{height:44px;border:1px solid var(--border);border-radius:12px;padding:0 12px;background:var(--surface);color:var(--text)}
 [data-device="mobile"] .tabs{display:none}
 :root[data-theme="wood"] body {
-  background-image: url('https://i.imgur.com/5s8C9oN.jpeg');
-  background-size: cover;
+  background-color: #efe6d6;
+  background-image:
+    radial-gradient(900px 500px at 0% -8%, rgba(193,154,83,.20) 0%, rgba(193,154,83,0) 65%),
+    radial-gradient(900px 500px at 100% -10%, rgba(138,90,44,.16) 0%, rgba(138,90,44,0) 70%),
+    linear-gradient(180deg, #f8f4ec 0%, #eee2cf 60%, #e7d8bf 100%);
   background-attachment: fixed;
   font-family: 'Noto Serif', 'Segoe UI', serif;
   color: #3a2b1a;
 }
+:root[data-theme="wood"] body::after {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(138,90,44,.045) 0px, rgba(138,90,44,.045) 12px, transparent 12px, transparent 24px),
+    repeating-linear-gradient(-45deg, rgba(193,154,83,.03) 0px, rgba(193,154,83,.03) 10px, transparent 10px, transparent 20px);
+  opacity: .8;
+}
 :root[data-theme="wood"] .tea-form-container { max-width: 950px; margin: auto; padding: 32px; backdrop-filter: blur(1.5px); }
-:root[data-theme="wood"] .card { background: #f4e7d4; border-radius: 14px; padding: 22px; margin-bottom: 26px; border: 2px solid #a47c42; box-shadow: 0 5px 18px rgba(0,0,0,.18); background-image: url('https://i.imgur.com/knabMqh.png'); background-size: 18%; background-position: right bottom; background-repeat: no-repeat; }
+:root[data-theme="wood"] .card { background: #f4e7d4; border-radius: 14px; padding: 22px; margin-bottom: 26px; border: 2px solid #a47c42; box-shadow: 0 5px 18px rgba(0,0,0,.18); background-image: repeating-linear-gradient(45deg, rgba(138,90,44,.035) 0 8px, rgba(138,90,44,0) 8px 16px); }
 :root[data-theme="wood"] .card-title { font-size: 19px; font-weight: 800; margin-bottom: 14px; color: #a97a3a; text-shadow: 0 0 1px #cba368; border-left: 6px solid #8a5a2c; padding-left: 10px; }
 :root[data-theme="wood"] input, :root[data-theme="wood"] select { width: 100%; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; background: #fff8eb; border: 1px solid #b79867; font-size: 15px; }
 :root[data-theme="wood"] input:focus, :root[data-theme="wood"] select:focus { border-color: #b8833e; box-shadow: 0 0 0 3px rgba(197,146,78,.3); }
