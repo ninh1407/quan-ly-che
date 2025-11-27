@@ -332,6 +332,7 @@ export default function Sales() {
 
       <form onSubmit={onSubmit} className="form-grid">
         <div className="form-card">
+          <div className="card-title">Thông tin phiếu bán</div>
           <div className="group">
             <div>
               <label>Ngày bán</label>
@@ -352,6 +353,7 @@ export default function Sales() {
           </div>
         </div>
         <div className="form-card">
+          <div className="card-title">Người phụ trách</div>
           <div className="group">
             <div>
               <label>Người tạo phiếu</label>
@@ -370,6 +372,7 @@ export default function Sales() {
           </div>
         </div>
         <div className="form-card">
+          <div className="card-title">Khách & xuất khẩu</div>
           <div className="group">
             <div>
               <label>Khách hàng</label>
@@ -401,6 +404,7 @@ export default function Sales() {
           </div>
         </div>
         <div className="form-card">
+          <div className="card-title">Hàng hóa</div>
           <div className="group">
             <div>
               <label>Loại chè</label>
@@ -415,11 +419,13 @@ export default function Sales() {
               <input className="highlight" type="number" min="0.001" step="0.001" value={form.weight} onChange={(e) => change('weight', e.target.value)} />
             </div>
             <div>
-              <div className="muted">Tổng tạm tính: {totalPreview.toLocaleString()} • Lợi nhuận ước tính: {profitPreview.toLocaleString()}</div>
+              <div className="total-money">💰 Thành tiền dự tính: {totalPreview.toLocaleString()} đ</div>
+              <div className="muted">Lợi nhuận ước tính: {profitPreview.toLocaleString()}</div>
             </div>
           </div>
         </div>
         <div className="form-card">
+          <div className="card-title">Hình ảnh & Thanh toán</div>
           <div className="group">
             <div>
               <label>Trạng thái thanh toán</label>
@@ -430,11 +436,11 @@ export default function Sales() {
             </div>
             <div>
               {error && <div className="error">{error}</div>}
-              <button className="btn primary" type="submit">{editingId ? 'Lưu chỉnh sửa' : 'Thêm đơn bán'}</button>
+              <button className="submit" type="submit">{editingId ? 'Lưu chỉnh sửa' : 'Thêm đơn bán'}</button>
             </div>
           </div>
         </div>
-        <div className="card" style={{ marginTop:8, padding:8 }} onDragOver={(e)=> e.preventDefault()} onDrop={(e)=>{
+        <div className="card" style={{ marginTop:8, padding:12 }} onDragOver={(e)=> e.preventDefault()} onDrop={(e)=>{
           e.preventDefault(); const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(!f){return}
           if(!selected.length){ setError('Hãy chọn một dòng để đính kèm ảnh rồi thả ảnh vào'); return }
           const id=selected[0]; if(f.size>5*1024*1024){ setError('Ảnh phải nhỏ hơn 5MB'); return }
