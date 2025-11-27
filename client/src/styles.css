@@ -4,6 +4,7 @@
 .mobile-toolbar{display:none}
 [data-device="mobile"] .mobile-toolbar{display:flex}
 [data-device="mobile"] .container{padding-top:56px}
+@media (max-width:768px){ .mobile-toolbar{display:flex} }
 .nav-buttons{display:flex;gap:10px;flex-wrap:wrap}
 .hamburger-btn{padding:10px 12px;border:1px solid var(--border);background:var(--accent);border-radius:10px}
 .hamburger-btn{display:inline-block}
