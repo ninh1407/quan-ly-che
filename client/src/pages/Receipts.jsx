@@ -56,7 +56,7 @@ export default function Receipts() {
   useEffect(() => { load() }, [month, year, type])
   useEffect(() => { const t = setTimeout(() => load(), 250); return () => clearTimeout(t) }, [q])
 
-  return (
+  return (<>
     <div className="card">
       <h2>Ảnh hóa đơn</h2>
       <div className="filters">
@@ -123,5 +123,5 @@ export default function Receipts() {
         </div>
       </div>
     )}
-  )
+  </>)
 }
