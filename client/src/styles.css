@@ -28,7 +28,8 @@
 .form{display:grid;grid-template-columns:1fr;gap:6px;align-items:center}
 .form label{font-weight:700}
 .filters label{font-weight:700}
-input,select{height:52px;border:1px solid var(--border);border-radius:12px;padding:0 14px;background:var(--surface);color:var(--text);font-size:18px}
+input,select{height:46px;border:1px solid #dfe3ea;border-radius:10px;padding:0 12px;background:#fff;color:var(--text);font-size:16px}
+input::placeholder{color:#94a3b8}
 input:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(25,118,210,.15)}
 input[type="number"]{text-align:right}
 .table-wrap{width:100%;overflow-x:auto}
