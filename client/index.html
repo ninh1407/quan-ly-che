@@ -23,9 +23,27 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function(){ navigator.serviceWorker.register('/sw.js') })
-      }
+      (function(){
+        try {
+          var ver = 'v3-2025-11-27';
+          var key = 'app_version';
+          var old = localStorage.getItem(key);
+          if (old !== ver) {
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function(rs){ rs.forEach(function(r){ r.unregister() }) })
+            }
+            if (window.caches && window.caches.keys) {
+              caches.keys().then(function(ks){ ks.forEach(function(k){ caches.delete(k) }) })
+            }
+            localStorage.setItem(key, ver);
+          }
+          if (location.protocol === 'https:' || location.hostname === 'localhost') {
+            if ('serviceWorker' in navigator) {
+              window.addEventListener('load', function(){ navigator.serviceWorker.register('/sw.js') })
+            }
+          }
+        } catch {}
+      })();
     </script>
   </body>
 </html>
