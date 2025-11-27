@@ -39,7 +39,7 @@ export default function Receipts() {
           api.get('/expenses', { params: base })
         ])
         let items = []
-        const add = (arr, t, dateKey) => { (arr||[]).forEach(r => { if (r.receipt_path) { const inv = r.invoice_no || r.ticket_name || r.weigh_ticket_code || r.contract || ''; items.push({ type:t, id:r.id, date:r[dateKey], owner:r.owner||r.created_by||null, invoice_no: inv }) } }) }
+        const add = (arr, t, dateKey) => { (arr||[]).forEach(r => { if (r.receipt_path) { const inv = r.invoice_no || r.ticket_name || r.weigh_ticket_code || r.contract || ''; items.push({ type:t, id:r.id, date:r[dateKey], owner:r.owner||r.created_by||null, invoice_no: inv, payment_status: r.payment_status||null }) } }) }
         if (type==='all' || type==='sales') add(rs.data||[], 'sales', 'sale_date')
         if (type==='all' || type==='purchases') add(rp.data||[], 'purchases', 'purchase_date')
         if (type==='all' || type==='expenses') add(re.data||[], 'expenses', 'expense_date')
@@ -92,8 +92,12 @@ export default function Receipts() {
                   <td>{r.invoice_no||''}</td>
                   <td>{r.owner||''}</td>
                   <td style={{ display:'flex', gap:6 }}>
-                    <button className="btn" onClick={()=> setViewer({ open:true, url: ep(r.type, r.id), scale:1, img:true })}>Thu phóng</button>
-                    <a className="btn" href={ep(r.type, r.id)} target="_blank" rel="noreferrer">Mở tab</a>
+                    {((r.type==='expenses') || String(r.payment_status||'')==='paid') ? (
+                      <>
+                        <button className="btn" onClick={()=> setViewer({ open:true, url: ep(r.type, r.id), scale:1, img:true })}>Thu phóng</button>
+                        <a className="btn" href={ep(r.type, r.id)} target="_blank" rel="noreferrer">Mở tab</a>
+                      </>
+                    ) : (<span className="muted">Chưa có tệp</span>)}
                   </td>
                 </tr>
               ))}

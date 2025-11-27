@@ -1783,7 +1783,8 @@ app.get('/receipts', requireAuth, async (req, res) => {
             id: r.id,
             date: r.sale_date||r.purchase_date||r.expense_date,
             owner: r.owner||r.created_by||null,
-            invoice_no: r.invoice_no || r.ticket_name || r.weigh_ticket_code || null
+            invoice_no: r.invoice_no || r.ticket_name || r.weigh_ticket_code || null,
+            payment_status: r.payment_status || null
           })
         })
       };
@@ -1832,18 +1833,18 @@ app.get('/receipts', requireAuth, async (req, res) => {
       clauses.length = 0; params.length = 0;
       clauses.push('sales.receipt_path IS NOT NULL'); addDate('sale_date');
       if (missing) clauses.push("(invoice_no IS NULL OR TRIM(COALESCE(invoice_no,'')) = '')")
-      sql = `SELECT 'sales' AS type, id, sale_date AS d, owner, ${salesInvExpr} AS invoice_no FROM sales ${clauses.length?'WHERE '+clauses.join(' AND '):''}${ownerClause('sales')} ORDER BY d DESC, id DESC LIMIT ${limit}`;
+      sql = `SELECT 'sales' AS type, id, sale_date AS d, owner, ${salesInvExpr} AS invoice_no, payment_status FROM sales ${clauses.length?'WHERE '+clauses.join(' AND '):''}${ownerClause('sales')} ORDER BY d DESC, id DESC LIMIT ${limit}`;
       params.push(...ownerParam);
     } else if (wantType==='purchases') {
       clauses.length = 0; params.length = 0;
       clauses.push('purchases.receipt_path IS NOT NULL'); addDate('purchase_date');
       if (missing) clauses.push("(invoice_no IS NULL OR TRIM(COALESCE(invoice_no,'')) = '')")
-      sql = `SELECT 'purchases' AS type, id, purchase_date AS d, owner, ${purchInvExpr} AS invoice_no FROM purchases ${clauses.length?'WHERE '+clauses.join(' AND '):''}${ownerClause('purchases')} ORDER BY d DESC, id DESC LIMIT ${limit}`;
+      sql = `SELECT 'purchases' AS type, id, purchase_date AS d, owner, ${purchInvExpr} AS invoice_no, payment_status FROM purchases ${clauses.length?'WHERE '+clauses.join(' AND '):''}${ownerClause('purchases')} ORDER BY d DESC, id DESC LIMIT ${limit}`;
       params.push(...ownerParam);
     } else if (wantType==='expenses') {
       clauses.length = 0; params.length = 0;
       clauses.push('expenses.receipt_path IS NOT NULL'); addDate('expense_date');
-      sql = `SELECT 'expenses' AS type, id, expense_date AS d, owner, NULL AS invoice_no FROM expenses ${clauses.length?'WHERE '+clauses.join(' AND '):''}${ownerClause('expenses')} ORDER BY d DESC, id DESC LIMIT ${limit}`;
+      sql = `SELECT 'expenses' AS type, id, expense_date AS d, owner, NULL AS invoice_no, NULL AS payment_status FROM expenses ${clauses.length?'WHERE '+clauses.join(' AND '):''}${ownerClause('expenses')} ORDER BY d DESC, id DESC LIMIT ${limit}`;
       params.push(...ownerParam);
     } else {
       const salesWhere = []; const purchasesWhere = []; const expensesWhere = [];
@@ -1851,18 +1852,18 @@ app.get('/receipts', requireAuth, async (req, res) => {
       if (mStr && yStr) { salesWhere.push("strftime('%m', sale_date) = ?"); salesWhere.push("strftime('%Y', sale_date) = ?"); purchasesWhere.push("strftime('%m', purchase_date) = ?"); purchasesWhere.push("strftime('%Y', purchase_date) = ?"); expensesWhere.push("strftime('%m', expense_date) = ?"); expensesWhere.push("strftime('%Y', expense_date) = ?"); params.push(mStr,yStr,mStr,yStr,mStr,yStr); }
       if (onlyMine) { salesWhere.push('sales.owner = ?'); purchasesWhere.push('purchases.owner = ?'); expensesWhere.push('expenses.owner = ?'); params.push(uname, uname, uname); }
       sql = `
-        SELECT 'sales' AS type, id, sale_date AS d, owner, ${salesInvExpr} AS invoice_no FROM sales ${salesWhere.length?'WHERE '+salesWhere.join(' AND '):''}
+        SELECT 'sales' AS type, id, sale_date AS d, owner, ${salesInvExpr} AS invoice_no, payment_status FROM sales ${salesWhere.length?'WHERE '+salesWhere.join(' AND '):''}
         UNION ALL
-        SELECT 'purchases' AS type, id, purchase_date AS d, owner, ${purchInvExpr} AS invoice_no FROM purchases ${purchasesWhere.length?'WHERE '+purchasesWhere.join(' AND '):''}
+        SELECT 'purchases' AS type, id, purchase_date AS d, owner, ${purchInvExpr} AS invoice_no, payment_status FROM purchases ${purchasesWhere.length?'WHERE '+purchasesWhere.join(' AND '):''}
         UNION ALL
-        SELECT 'expenses' AS type, id, expense_date AS d, owner, NULL AS invoice_no FROM expenses ${expensesWhere.length?'WHERE '+expensesWhere.join(' AND '):''}
+        SELECT 'expenses' AS type, id, expense_date AS d, owner, NULL AS invoice_no, NULL AS payment_status FROM expenses ${expensesWhere.length?'WHERE '+expensesWhere.join(' AND '):''}
         ORDER BY d DESC, id DESC LIMIT ${limit}
       `;
       if (missing) { sql = sql.replace('FROM sales', "FROM sales WHERE (invoice_no IS NULL OR TRIM(COALESCE(invoice_no,'')) = '')").replace('FROM purchases', "FROM purchases WHERE (invoice_no IS NULL OR TRIM(COALESCE(invoice_no,'')) = '')") }
     }
     db.all(sql, params, (err, rows) => {
       if (err) return res.status(500).json({ message: 'DB error', detail: err.message });
-      const data = (rows||[]).map(r => ({ type: r.type, id: r.id, date: r.d, owner: r.owner||null, invoice_no: r.invoice_no || null }));
+      const data = (rows||[]).map(r => ({ type: r.type, id: r.id, date: r.d, owner: r.owner||null, invoice_no: r.invoice_no || null, payment_status: r.payment_status || null }));
       res.json(data);
     });
   } catch (e) {
