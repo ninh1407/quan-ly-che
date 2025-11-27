@@ -113,7 +113,7 @@ body{background:var(--bg)}
 @media (max-width:768px){.container{padding:0 14px}.btn{padding:8px 12px}.card{padding:14px;border-radius:12px}.table th,.table td{padding:10px}}
 .mobile-only{display:none}
 /* Mobile top toolbar */
-.mobile-toolbar{position:fixed;top:0;left:0;right:0;padding:8px 12px;display:none;gap:8;align-items:center;background:var(--surface);border-bottom:1px solid var(--border);z-index:4000}
+.mobile-toolbar{position:fixed;top:calc(env(safe-area-inset-top, 0px));left:0;right:0;padding:8px 12px;display:flex;gap:8;align-items:center;background:var(--surface);border-bottom:1px solid var(--border);z-index:4000}
 @media (max-width:768px){
   .form{grid-template-columns:1fr;gap:10px}
   input,select{height:48px}
@@ -127,6 +127,8 @@ body{background:var(--bg)}
 }
 .device-override{display:block}
 [data-device="pc"] .mobile-toolbar{display:none}
+[data-device="mobile"] .mobile-toolbar{display:flex}
+@media (min-width:769px){ .mobile-toolbar{display:none} }
 [data-device="mobile"] .mobile-toolbar{display:flex}
 [data-device="mobile"] .form{grid-template-columns:1fr}
 [data-device="mobile"] .filters{grid-template-columns:1fr}
