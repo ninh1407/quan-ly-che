@@ -448,7 +448,7 @@ export default function Purchases() {
                   <td className="num">{fmtMoney(r.unit_price)}</td>
                   <td className="num">{fmtMoney(r.total_cost)}</td>
                   <td><span className={`pill ${r.payment_status}`}>{STATUS_LABELS[r.payment_status] || r.payment_status}</span></td>
-                  <td>{r.receipt_path ? (
+                  <td>{(r.payment_status==='paid' && r.receipt_path) ? (
                     <div style={{ display:'flex', gap:6 }}>
                       <button className="btn" onClick={()=> setViewer({ open:true, url: receiptEndpoint('purchases', r.id), scale:1, img:true })}>Thu phóng</button>
                       <a href={receiptEndpoint('purchases', r.id)} target="_blank" rel="noreferrer">Mở tab</a>

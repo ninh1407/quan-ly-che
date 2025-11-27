@@ -503,7 +503,7 @@ export default function Sales() {
                   <td className="num">{(Number(r.weight)||0).toLocaleString()}</td>
                   <td className="num">{fmtMoney(r.total_amount)}</td>
                   <td><span className={`pill ${r.payment_status}`}>{STATUS_LABELS[r.payment_status] || r.payment_status}</span></td>
-                  <td>{r.receipt_path ? (
+                  <td>{(r.payment_status==='paid' && r.receipt_path) ? (
                     <div style={{ display:'flex', gap:6 }}>
                       <button className="btn" onClick={()=> setViewer({ open:true, url: receiptEndpoint('sales', r.id), scale:1, img:true })}>Thu phóng</button>
                       <a href={receiptEndpoint('sales', r.id)} target="_blank" rel="noreferrer">Mở tab</a>
