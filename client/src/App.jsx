@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Sales from './pages/Sales.jsx'
 import Purchases from './pages/Purchases.jsx'
 import Expenses from './pages/Expenses.jsx'
@@ -46,9 +46,9 @@ export default function App() {
         'customers','suppliers','changePwd'
       ]))
   const go = (k) => { if (allowedTabs.includes(k)) { setTab(k); try { localStorage.setItem('current_tab', k) } catch {} } else toast('Không có quyền truy cập') }
-  React.useEffect(() => { if (!allowedTabs.includes(tab)) setTab(allowedTabs[0]) }, [])
-  React.useEffect(() => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('theme', theme) }, [theme])
-  React.useEffect(() => {
+  useEffect(() => { if (!allowedTabs.includes(tab)) setTab(allowedTabs[0]) }, [])
+  useEffect(() => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('theme', theme) }, [theme])
+  useEffect(() => {
     try {
       const ua = navigator.userAgent || ''
       const isMobileUA = /Android|iPhone|iPad|iPod/i.test(ua)
@@ -61,15 +61,15 @@ export default function App() {
       localStorage.setItem('device', 'pc')
     }
   }, [])
-  React.useEffect(() => {
+  useEffect(() => {
     const h = (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setCmdOpen(true) } }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
   }, [])
-  React.useEffect(() => {
+  useEffect(() => {
     window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallEvt(e) })
   }, [])
-  React.useEffect(() => {
+  useEffect(() => {
     try {
       const ua = navigator.userAgent || ''
       const isiOS = /iPad|iPhone|iPod/.test(ua) || ((navigator.platform||'')==='MacIntel' && Number(navigator.maxTouchPoints||0)>1)
@@ -100,8 +100,8 @@ export default function App() {
     } catch {}
     try { location.reload(true) } catch { location.reload() }
   }
-  React.useEffect(() => { (async () => { try { const r = await api.get('/notifications'); const items = r.data||[]; setNotifs(items); } catch {} })() }, [notifOpen])
-  React.useEffect(() => {
+  useEffect(() => { (async () => { try { const r = await api.get('/notifications'); const items = r.data||[]; setNotifs(items); } catch {} })() }, [notifOpen])
+  useEffect(() => {
     let timer = null
     const extractCount = (arr, re) => {
       for (const s of (arr||[])) { const m = String(s).match(re); if (m) return Number(m[1]||0) }
@@ -310,7 +310,7 @@ export default function App() {
     </div>
   )
 }
-  React.useEffect(() => {
+  useEffect(() => {
     const closeOutside = (e) => {
       document.querySelectorAll('details.dropdown[open]').forEach((d) => { if (!d.contains(e.target)) d.removeAttribute('open') })
     }
