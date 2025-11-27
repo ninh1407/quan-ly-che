@@ -303,7 +303,7 @@ export default function Sales() {
     w.document.close(); w.focus(); w.print();
   };
 
-  return (
+  return (<>
     <div className="card">
       <h2>Bán chè</h2>
       <div className="section-bar">
@@ -627,5 +627,5 @@ export default function Sales() {
         </div>
       </div>
     )}
-  );
+  </>);
 }
