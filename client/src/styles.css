@@ -361,7 +361,6 @@ html{scroll-behavior:smooth; background: var(--bg)}
 @media (orientation: landscape){
   .tabs{gap:6px}
   [data-device="mobile"] .container{padding-top:calc(128px + env(safe-area-inset-top, 0px))}
-}
   .form-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
   .section-bar.filter-grid{grid-template-columns:repeat(2,minmax(180px,1fr));gap:10px}
   .table{font-size:13px}
