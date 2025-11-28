@@ -31,19 +31,7 @@
     <script>
       (function(){
         try {
-          var ver = window.APP_VER || 'v5-2025-11-28-02';
           var key = 'app_version';
-          var old = localStorage.getItem(key);
-          if (old !== ver) {
-            if ('serviceWorker' in navigator) {
-              navigator.serviceWorker.getRegistrations().then(function(rs){ rs.forEach(function(r){ r.unregister() }) })
-            }
-            if (window.caches && window.caches.keys) {
-              caches.keys().then(function(ks){ ks.forEach(function(k){ caches.delete(k) }) })
-            }
-            localStorage.setItem(key, ver);
-            try { location.reload(true) } catch { location.reload() }
-          }
           // Tạm thời tắt đăng ký Service Worker để tránh trắng trang khi demo
           // (đã có cơ chế tự gỡ cache theo phiên bản ở trên)
           // Nếu cần bật lại, đổi điều kiện dưới đây thành true.
@@ -53,7 +41,7 @@
             }
           }
           try { if (screen && screen.orientation && screen.orientation.lock) { screen.orientation.lock('landscape').catch(function(){}) } } catch {}
-          try { window.addEventListener('focus', function(){ if (navigator.onLine) { try { location.reload(true) } catch { location.reload() } } }) } catch {}
+          // no auto-reload on focus to avoid loops
           try {
             var overlay = document.getElementById('orientation-overlay');
             var isMobileUA = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');
@@ -73,6 +61,9 @@
                 var sv = String(j && j.version || '').trim();
                 var cv = localStorage.getItem('app_version');
                 if (sv && sv !== cv) {
+                  var reloaded = sessionStorage.getItem('reloaded_for_version');
+                  if (reloaded === sv) return;
+                  sessionStorage.setItem('reloaded_for_version', sv);
                   localStorage.setItem('app_version', sv);
                   if ('serviceWorker' in navigator) { navigator.serviceWorker.getRegistrations().then(function(rs){ rs.forEach(function(r){ r.unregister() }) }) }
                   if (window.caches && window.caches.keys) { caches.keys().then(function(ks){ ks.forEach(function(k){ caches.delete(k) }) }) }
