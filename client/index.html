@@ -25,11 +25,8 @@
   <body>
     <div id="root"></div>
     <div id="orientation-overlay"><div class="card" style="max-width:520px;text-align:center"><div style="font-weight:700;margin-bottom:8px">Vui lòng quay ngang điện thoại</div><div class="muted">Ứng dụng yêu cầu chế độ ngang để hiển thị đầy đủ.</div></div></div>
-    <script type="module">
-      const ver = 'v5-2025-11-28-02'
-      window.APP_VER = ver
-      import(`/src/main.jsx?v=${ver}`)
-    </script>
+    <script>window.APP_VER = 'v5-2025-11-28-02'</script>
+    <script type="module" src="/src/main.jsx?v=v5-2025-11-28-02"></script>
     <script>
       (function(){
         try {
