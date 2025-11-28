@@ -47,6 +47,19 @@
             }
           }
           try { if (screen && screen.orientation && screen.orientation.lock) { screen.orientation.lock('landscape').catch(function(){}) } } catch {}
+          try {
+            var overlay = document.getElementById('orientation-overlay');
+            var isMobileUA = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');
+            var updateOverlay = function(){
+              var isPortrait = window.matchMedia && window.matchMedia('(orientation: portrait)').matches;
+              if (overlay) {
+                if (isMobileUA && isPortrait) overlay.classList.add('show'); else overlay.classList.remove('show');
+              }
+            };
+            updateOverlay();
+            window.addEventListener('resize', updateOverlay);
+            window.addEventListener('orientationchange', updateOverlay);
+          } catch {}
         } catch {}
       })();
     </script>

@@ -97,6 +97,7 @@ h1{background:var(--primary);color:#fff;padding:14px 16px;border-radius:16px;box
 body{background:var(--bg)}
 body{margin:0}
 #orientation-overlay{position:fixed;inset:0;background:var(--surface);display:none;align-items:center;justify-content:center;z-index:100000}
+#orientation-overlay.show{display:flex}
 /* Hero branding for tea trading */
 .hero{position:relative;border-radius:20px;padding:32px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#e0f2fe 0%,#fef3c7 60%,#fce7f3 100%);box-shadow:0 10px 28px rgba(0,0,0,.08);margin-bottom:16px;border:1px solid var(--border)}
 .hero{margin-bottom:24px}
@@ -359,7 +360,6 @@ html{scroll-behavior:smooth; background: var(--bg)}
   .section-bar.filter-grid{grid-template-columns:1fr;gap:10px}
   .tabs{gap:8px}
   .chart-card{height:240px}
-  [data-device="mobile"] #orientation-overlay{display:flex}
 }
 @media (orientation: landscape){
   .tabs{gap:6px}
