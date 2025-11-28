@@ -3,7 +3,7 @@
 [data-device="pc"] .mobile-toolbar{display:none}
 .mobile-toolbar{display:none}
 [data-device="mobile"] .mobile-toolbar{display:flex}
-[data-device="mobile"] .container{padding-top:calc(64px + env(safe-area-inset-top, 0px))}
+[data-device="mobile"] .container{padding-top:calc(110px + env(safe-area-inset-top, 0px))}
 @media (max-width:768px){ .mobile-toolbar{display:flex} }
 .nav-buttons{display:flex;gap:10px;flex-wrap:wrap}
 .hamburger-btn{padding:10px 12px;border:1px solid var(--border);background:var(--accent);border-radius:10px}
@@ -119,7 +119,7 @@ body{margin:0}
 @media (max-width:768px){.container{padding:0 14px}.btn{padding:8px 12px}.card{padding:14px;border-radius:12px}.table th,.table td{padding:10px}}
 .mobile-only{display:none}
 .desktop-only{display:inline-block}
-.mobile-toolbar{position:fixed;top:calc(env(safe-area-inset-top, 0px));left:0;right:0;padding:10px 14px;gap:8;align-items:center;background:var(--surface);border-bottom:1px solid var(--border);z-index:99999;pointer-events:auto;display:none}
+.mobile-toolbar{position:fixed;top:calc(env(safe-area-inset-top, 0px));left:0;right:0;padding:10px 14px;gap:8;align-items:center;background:var(--surface);border-bottom:1px solid var(--border);z-index:99999;pointer-events:auto;display:none;min-height:50px}
 .mobile-toolbar .btn{background:var(--primary);color:#fff;border-color:var(--primary)}
 @media (max-width:768px){
   .form{grid-template-columns:1fr;gap:10px}
@@ -148,7 +148,7 @@ body{margin:0}
 [data-device="mobile"] .card{border-radius:18px;padding:16px;overflow:visible}
 [data-device="mobile"] .table-wrap{overflow-x:auto}
 [data-device="mobile"] .hero{padding:20px;border-radius:18px}
-[data-device="mobile"] .tabs{position:fixed;top:calc(env(safe-area-inset-top, 0px));left:0;right:0;gap:8px;padding:8px 10px;min-height:48px;overflow-x:auto;flex-wrap:nowrap;white-space:nowrap;-webkit-overflow-scrolling:touch;background:var(--surface);border-bottom:1px solid var(--border);z-index:10000}
+[data-device="mobile"] .tabs{position:fixed;top:calc(env(safe-area-inset-top, 0px) + 50px);left:0;right:0;gap:8px;padding:8px 10px;min-height:48px;overflow-x:auto;flex-wrap:nowrap;white-space:nowrap;-webkit-overflow-scrolling:touch;background:var(--surface);border-bottom:1px solid var(--border);z-index:10000}
 [data-device="mobile"] .tabs .btn,[data-device="mobile"] .hamburger-btn{padding:8px 10px;font-size:14px;height:auto}
 [data-device="mobile"] .grid-2{grid-template-columns:1fr;gap:10px}
 [data-device="mobile"] .section-bar{padding:8px 10px;gap:10px}
@@ -360,6 +360,8 @@ html{scroll-behavior:smooth; background: var(--bg)}
 }
 @media (orientation: landscape){
   .tabs{gap:6px}
+  [data-device="mobile"] .container{padding-top:calc(128px + env(safe-area-inset-top, 0px))}
+}
   .form-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
   .section-bar.filter-grid{grid-template-columns:repeat(2,minmax(180px,1fr));gap:10px}
   .table{font-size:13px}
