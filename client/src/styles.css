@@ -129,7 +129,7 @@ body{margin:0}
   .section-bar{flex-wrap:wrap}
   .hero{display:none !important}
   .hamburger-btn{position:fixed;top:8px;left:8px;z-index:3000;border-radius:12px}
-  .tabs{padding-top:48px; position:static !important}
+  .tabs{padding-top:48px; position:sticky; top:56px}
   /* mobile-toolbar visibility handled above */
   .mobile-only{display:inline-block}
   .desktop-only{display:none}
