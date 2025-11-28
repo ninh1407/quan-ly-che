@@ -69,7 +69,7 @@
           } catch {}
           try {
             var poll = function(){
-              fetch('/version', { cache:'no-store' }).then(function(r){ return r.json() }).then(function(j){
+              fetch('/api/version', { cache:'no-store' }).then(function(r){ return r.json() }).then(function(j){
                 var sv = String(j && j.version || '').trim();
                 var cv = localStorage.getItem('app_version');
                 if (sv && sv !== cv) {
@@ -85,6 +85,7 @@
                 }
               }).catch(function(){})
             };
+            poll();
             setInterval(poll, 60000);
           } catch {}
         } catch {}
