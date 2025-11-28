@@ -2634,6 +2634,23 @@ app.get('/health', (req, res) => {
   res.json({ ok: true, mongo: !!MONGO_READY });
 });
 
+// App version endpoint for client auto-refresh
+app.get('/version', (req, res) => {
+  try {
+    const v = String(process.env.APP_VERSION || '').trim()
+    const version = v || new Date().toISOString().slice(0,10)
+    res.json({ version })
+  } catch (e) { res.json({ version: 'unknown' }) }
+})
+// alias for nginx proxy /api/version
+app.get('/api/version', (req, res) => {
+  try {
+    const v = String(process.env.APP_VERSION || '').trim()
+    const version = v || new Date().toISOString().slice(0,10)
+    res.json({ version })
+  } catch (e) { res.json({ version: 'unknown' }) }
+})
+
 app.get('/whoami', requireAuth, (req, res) => {
   res.json({ user: req.user || null })
 })
