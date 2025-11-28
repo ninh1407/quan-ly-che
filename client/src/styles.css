@@ -5,7 +5,7 @@
 [data-device="pc"] .container{padding-top:72px}
 .mobile-toolbar{display:none}
 [data-device="mobile"] .mobile-toolbar{display:flex}
-[data-device="mobile"] .container{padding-top:calc(84px + env(safe-area-inset-top, 0px))}
+[data-device="mobile"] .container{padding-top:calc(64px + env(safe-area-inset-top, 0px))}
 @media (max-width:768px){ .mobile-toolbar{display:flex} }
 .nav-buttons{display:flex;gap:10px;flex-wrap:wrap}
 .hamburger-btn{padding:10px 12px;border:1px solid var(--border);background:var(--accent);border-radius:10px}
@@ -150,7 +150,7 @@ body{margin:0}
 [data-device="mobile"] .card{border-radius:18px;padding:16px;overflow:visible}
 [data-device="mobile"] .table-wrap{overflow-x:auto}
 [data-device="mobile"] .hero{padding:20px;border-radius:18px}
-[data-device="mobile"] .tabs{position:fixed;top:calc(env(safe-area-inset-top, 0px) + 40px);left:0;right:0;gap:6px;padding:4px 8px;min-height:36px;overflow-x:auto;flex-wrap:nowrap;white-space:nowrap;-webkit-overflow-scrolling:touch;background:var(--surface);border-bottom:1px solid var(--border);z-index:10000}
+[data-device="mobile"] .tabs{display:none !important}
 [data-device="mobile"] .tabs .btn,[data-device="mobile"] .hamburger-btn{padding:6px 8px;font-size:13px;height:auto}
 [data-device="mobile"] .grid-2{grid-template-columns:1fr;gap:10px}
 [data-device="mobile"] .section-bar{padding:8px 10px;gap:10px}
@@ -362,7 +362,7 @@ html{scroll-behavior:smooth; background: var(--bg)}
 }
 @media (orientation: landscape){
   .tabs{gap:6px}
-  [data-device="mobile"] .container{padding-top:calc(96px + env(safe-area-inset-top, 0px))}
+  [data-device="mobile"] .container{padding-top:calc(80px + env(safe-area-inset-top, 0px))}
   .form-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
   .section-bar.filter-grid{grid-template-columns:repeat(2,minmax(180px,1fr));gap:10px}
   .table{font-size:13px}
