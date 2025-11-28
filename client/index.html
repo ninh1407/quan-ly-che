@@ -21,6 +21,7 @@
   </head>
   <body>
     <div id="root"></div>
+    <div id="orientation-overlay"><div class="card" style="max-width:520px;text-align:center"><div style="font-weight:700;margin-bottom:8px">Vui lòng quay ngang điện thoại</div><div class="muted">Ứng dụng yêu cầu chế độ ngang để hiển thị đầy đủ.</div></div></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
       (function(){
@@ -45,6 +46,7 @@
               window.addEventListener('load', function(){ navigator.serviceWorker.register('/sw.js') })
             }
           }
+          try { if (screen && screen.orientation && screen.orientation.lock) { screen.orientation.lock('landscape').catch(function(){}) } } catch {}
         } catch {}
       })();
     </script>
