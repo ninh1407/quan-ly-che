@@ -60,15 +60,7 @@ if (SQLITE_READY) {
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA busy_timeout = 3000');
   try {
-    db.serialize(() => {
-      db.run("CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(sale_date)")
-      db.run("CREATE INDEX IF NOT EXISTS idx_sales_payment ON sales(payment_status)")
-      db.run("CREATE INDEX IF NOT EXISTS idx_sales_invoice ON sales(invoice_no)")
-      db.run("CREATE INDEX IF NOT EXISTS idx_purchases_date ON purchases(purchase_date)")
-      db.run("CREATE INDEX IF NOT EXISTS idx_purchases_payment ON purchases(payment_status)")
-      db.run("CREATE INDEX IF NOT EXISTS idx_purchases_invoice ON purchases(invoice_no)")
-      db.run("CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, user TEXT, entity TEXT, entity_id INTEGER, action TEXT, changes TEXT, ip TEXT, ua TEXT, city TEXT)")
-    })
+    // Indexes will be created after tables are ensured below
   } catch {}
 }
 
@@ -731,6 +723,13 @@ if (SQLITE_READY) db.serialize(() => {
     unit_cost REAL,
     note TEXT
   )`);
+  // Create indexes after tables exist
+  db.run("CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(sale_date)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_sales_payment ON sales(payment_status)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_sales_invoice ON sales(invoice_no)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_purchases_date ON purchases(purchase_date)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_purchases_payment ON purchases(payment_status)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_purchases_invoice ON purchases(invoice_no)");
 });
 
 function pad2(n) { return String(n).padStart(2, '0'); }

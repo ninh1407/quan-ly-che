@@ -34,8 +34,8 @@ export default function Debts() {
         api.get('/sales', { params }),
         api.get('/purchases', { params })
       ])
-      setSales(rs.data || [])
-      setPurchases(rp.data || [])
+      setSales(Array.isArray(rs.data) ? rs.data : [])
+      setPurchases(Array.isArray(rp.data) ? rp.data : [])
     } catch (e) {
       setError(e?.response?.data?.message || 'Tải công nợ lỗi')
     } finally {

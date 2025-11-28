@@ -138,10 +138,10 @@ export default function Sales() {
   }, [])
   useEffect(() => {
     (async () => {
-      try { const c = await api.get('/customers'); setCustomers(c.data || []); } catch {}
-      try { const s = await api.get('/staff'); setStaff(s.data || []); } catch {}
-      try { const so = await api.get('/sales'); setRecentSales((so.data||[]).slice(-200)) } catch {}
-      try { const p = await api.get('/purchases'); setRecentPurchases((p.data||[]).slice(-200)) } catch {}
+      try { const c = await api.get('/customers'); setCustomers(Array.isArray(c.data) ? c.data : []); } catch {}
+      try { const s = await api.get('/staff'); setStaff(Array.isArray(s.data) ? s.data : []); } catch {}
+      try { const so = await api.get('/sales'); setRecentSales(Array.isArray(so.data) ? so.data.slice(-200) : []) } catch {}
+      try { const p = await api.get('/purchases'); setRecentPurchases(Array.isArray(p.data) ? p.data.slice(-200) : []) } catch {}
     })();
   }, []);
   useEffect(() => { try { const d = JSON.parse(localStorage.getItem(draftKey)||'null'); if (d && d.form) setForm(f => ({ ...f, ...d.form })) } catch {} }, [])

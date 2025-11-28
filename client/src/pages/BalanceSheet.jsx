@@ -67,11 +67,11 @@ export default function BalanceSheet() {
         api.get('/finished-stock', { params: paramsAll }),
         api.get('/finished-stock'),
       ])
-      let salesAll = rsAll.data||[]
-      let purchAll = rpAll.data||[]
-      let expAll = rexpAll.data||[]
-      let pendSales = rsPending.data||[]
-      let pendPurch = rpPending.data||[]
+      let salesAll = Array.isArray(rsAll.data) ? rsAll.data : []
+      let purchAll = Array.isArray(rpAll.data) ? rpAll.data : []
+      let expAll = Array.isArray(rexpAll.data) ? rexpAll.data : []
+      let pendSales = Array.isArray(rsPending.data) ? rsPending.data : []
+      let pendPurch = Array.isArray(rpPending.data) ? rpPending.data : []
       if (selectedDay !== 'all') {
         const dd = String(selectedDay).padStart(2,'0')
         const dateStr = `${year}-${String(month).padStart(2,'0')}-${dd}`
@@ -80,7 +80,7 @@ export default function BalanceSheet() {
         expAll = expAll.filter(r => String(r.expense_date) === dateStr)
         pendSales = pendSales.filter(r => String(r.sale_date) === dateStr)
         pendPurch = pendPurch.filter(r => String(r.purchase_date) === dateStr)
-        const fgAllDay = (rfgAll.data||[]).filter(r => String(r.entry_date) === dateStr)
+        const fgAllDay = (Array.isArray(rfgAll.data) ? rfgAll.data : []).filter(r => String(r.entry_date) === dateStr)
         rfgAll.data = fgAllDay
       }
       const receivables = pendSales.reduce((s, r) => s + Number(r.total_amount != null ? r.total_amount : (Number(r.price_per_kg||0) * Number(r.weight||0))), 0)
@@ -121,9 +121,9 @@ export default function BalanceSheet() {
       const paidPurchases = purchAll.filter(r => String(r.payment_status)==='paid').reduce((s,r)=> s + Number(r.total_cost != null ? r.total_cost : (Number(r.unit_price||0)*Number((r.net_weight ?? r.weight) || 0))), 0)
       const paidExpenses = expAll.reduce((s, r) => s + Number(r.amount||0), 0)
       const cashflowNet = paidSales - paidPurchases - paidExpenses
-      const salesGlobal = rsAllGlobal.data||[]
-      const purchGlobal = rpAllGlobal.data||[]
-      const expGlobal = rexpAllGlobal.data||[]
+      const salesGlobal = Array.isArray(rsAllGlobal.data) ? rsAllGlobal.data : []
+      const purchGlobal = Array.isArray(rpAllGlobal.data) ? rpAllGlobal.data : []
+      const expGlobal = Array.isArray(rexpAllGlobal.data) ? rexpAllGlobal.data : []
       const firstDay = new Date(`${String(year)}-${String(month).padStart(2,'0')}-01`)
       const openingPurch = purchGlobal.filter(r => new Date(r.purchase_date) < firstDay).reduce((s,r)=> s + Number((r.net_weight ?? r.weight) || 0), 0)
       const openingSales = salesGlobal.filter(r => new Date(r.sale_date) < firstDay).reduce((s,r)=> s + Number(r.weight || 0), 0)

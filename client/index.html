@@ -25,7 +25,7 @@
     <script>
       (function(){
         try {
-          var ver = 'v3-2025-11-27';
+          var ver = 'v4-2025-11-28-01';
           var key = 'app_version';
           var old = localStorage.getItem(key);
           if (old !== ver) {
@@ -37,7 +37,10 @@
             }
             localStorage.setItem(key, ver);
           }
-          if (location.protocol === 'https:' || location.hostname === 'localhost') {
+          // Tạm thời tắt đăng ký Service Worker để tránh trắng trang khi demo
+          // (đã có cơ chế tự gỡ cache theo phiên bản ở trên)
+          // Nếu cần bật lại, đổi điều kiện dưới đây thành true.
+          if (false && (location.protocol === 'https:' || location.hostname === 'localhost')) {
             if ('serviceWorker' in navigator) {
               window.addEventListener('load', function(){ navigator.serviceWorker.register('/sw.js') })
             }

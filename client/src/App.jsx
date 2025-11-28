@@ -125,8 +125,18 @@ export default function App() {
     timer = setInterval(loadBadges, 60_000)
     return () => { if (timer) clearInterval(timer) }
   }, [])
-  React.useEffect(() => {
-    
+  useEffect(() => {
+    const closeOutside = (e) => {
+      document.querySelectorAll('details.dropdown[open]').forEach((d) => {
+        if (!d.contains(e.target)) d.removeAttribute('open')
+      })
+    }
+    document.addEventListener('click', closeOutside, true)
+    document.addEventListener('touchstart', closeOutside, true)
+    return () => {
+      document.removeEventListener('click', closeOutside, true)
+      document.removeEventListener('touchstart', closeOutside, true)
+    }
   }, [])
   if (!authed) {
     return (
@@ -311,17 +321,3 @@ export default function App() {
     </div>
   )
 }
-  // đặt phần này bên trong component, ngay trước return()
-  useEffect(() => {
-    const closeOutside = (e) => {
-      document.querySelectorAll('details.dropdown[open]').forEach((d) => {
-        if (!d.contains(e.target)) d.removeAttribute('open')
-      })
-    }
-    document.addEventListener('click', closeOutside, true)
-    document.addEventListener('touchstart', closeOutside, true)
-    return () => {
-      document.removeEventListener('click', closeOutside, true)
-      document.removeEventListener('touchstart', closeOutside, true)
-    }
-  }, [])

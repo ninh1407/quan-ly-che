@@ -111,8 +111,8 @@ export default function Purchases() {
   }, [])
   useEffect(() => {
     (async () => {
-      try { const r = await api.get('/suppliers'); setSuppliers(r.data || []); } catch {}
-      try { const p = await api.get('/purchases'); setRecentPurchases((p.data||[]).slice(-200)) } catch {}
+      try { const r = await api.get('/suppliers'); setSuppliers(Array.isArray(r.data) ? r.data : []); } catch {}
+      try { const p = await api.get('/purchases'); setRecentPurchases(Array.isArray(p.data) ? p.data.slice(-200) : []) } catch {}
     })();
   }, []);
   useEffect(() => { try { const d = JSON.parse(localStorage.getItem(draftKey)||'null'); if (d && d.form) setForm(f => ({ ...f, ...d.form })) } catch {} }, [])

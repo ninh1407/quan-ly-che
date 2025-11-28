@@ -9,7 +9,7 @@ export default function CommandPalette({ open, onClose, onNavigate }) {
   const [purchases, setPurchases] = useState([])
   const [sales, setSales] = useState([])
   const [staff, setStaff] = useState([])
-  useEffect(() => { if (open) { (async () => { try { const s = await api.get('/suppliers'); setSuppliers(s.data||[]) } catch {} try { const c = await api.get('/customers'); setCustomers(c.data||[]) } catch {} try { const p = await api.get('/purchases'); setPurchases((p.data||[]).slice(0,200)) } catch {} try { const so = await api.get('/sales'); setSales((so.data||[]).slice(0,200)) } catch {} })() } }, [open])
+  useEffect(() => { if (open) { (async () => { try { const s = await api.get('/suppliers'); setSuppliers(Array.isArray(s.data) ? s.data : []) } catch {} try { const c = await api.get('/customers'); setCustomers(Array.isArray(c.data) ? c.data : []) } catch {} try { const p = await api.get('/purchases'); setPurchases(Array.isArray(p.data) ? p.data.slice(0,200) : []) } catch {} try { const so = await api.get('/sales'); setSales(Array.isArray(so.data) ? so.data.slice(0,200) : []) } catch {} })() } }, [open])
   const items = useMemo(() => {
     const role = (localStorage.getItem('role')||'user').toLowerCase()
     const base = [

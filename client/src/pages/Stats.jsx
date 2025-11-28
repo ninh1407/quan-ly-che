@@ -31,10 +31,10 @@ export default function Stats() {
     try {
       const res = await api.get('/stats', { params: { month, year } })
       setData(res.data || {})
-      try { const c = await api.get('/customers'); setCustomers(c.data || []) } catch {}
-      try { const s = await api.get('/sales', { params: { month, year } }); setSales(s.data||[]) } catch {}
-      try { const p = await api.get('/purchases', { params: { month, year } }); setPurchases(p.data||[]) } catch {}
-      try { const e = await api.get('/expenses', { params: { month, year } }); setExpenses(e.data||[]) } catch {}
+      try { const c = await api.get('/customers'); setCustomers(Array.isArray(c.data) ? c.data : []) } catch {}
+      try { const s = await api.get('/sales', { params: { month, year } }); setSales(Array.isArray(s.data) ? s.data : []) } catch {}
+      try { const p = await api.get('/purchases', { params: { month, year } }); setPurchases(Array.isArray(p.data) ? p.data : []) } catch {}
+      try { const e = await api.get('/expenses', { params: { month, year } }); setExpenses(Array.isArray(e.data) ? e.data : []) } catch {}
     } catch (e) { setError(e?.response?.data?.message || 'Tải thống kê lỗi') }
     finally { setLoading(false) }
   }
@@ -70,9 +70,9 @@ export default function Stats() {
   })()
   const buildReport = () => {
     if (reportType === 'fin_month') {
-      const totalSales = sales.reduce((s,r)=> s + (Number(r.total_amount != null ? r.total_amount : (Number(r.price_per_kg||0)*Number(r.weight||0)))||0), 0)
-      const totalPurchases = purchases.reduce((s,r)=> s + (Number(r.total_cost != null ? r.total_cost : (Number(r.unit_price||0)*Number((r.net_weight != null ? r.net_weight : r.weight)||0)) )||0), 0)
-      const totalExpenses = expenses.reduce((s,r)=> s + (Number(r.amount)||0), 0)
+      const totalSales = (Array.isArray(sales) ? sales : []).reduce((s,r)=> s + (Number(r.total_amount != null ? r.total_amount : (Number(r.price_per_kg||0)*Number(r.weight||0)))||0), 0)
+      const totalPurchases = (Array.isArray(purchases) ? purchases : []).reduce((s,r)=> s + (Number(r.total_cost != null ? r.total_cost : (Number(r.unit_price||0)*Number((r.net_weight != null ? r.net_weight : r.weight)||0)) )||0), 0)
+      const totalExpenses = (Array.isArray(expenses) ? expenses : []).reduce((s,r)=> s + (Number(r.amount)||0), 0)
       const net = totalSales - totalPurchases - totalExpenses
       const rows = [
         { Mục:'Thu', Giá_trị: totalSales },
@@ -84,8 +84,8 @@ export default function Stats() {
       return { rows, cols }
     }
     if (reportType === 'debts') {
-      const sPend = sales.filter(r => String(r.payment_status)==='pending').map(r => ({ Loại:'Thu', Ngày:r.sale_date, Đối_tác:r.customer_name||'', Tổng_tiền:Number(r.total_amount|| (Number(r.price_per_kg||0)*Number(r.weight||0))), Trạng_thái:r.payment_status }))
-      const pPend = purchases.filter(r => String(r.payment_status)==='pending').map(r => ({ Loại:'Chi', Ngày:r.purchase_date, Đối_tác:r.supplier_name||'', Tổng_tiền:Number(r.total_cost|| (Number(r.unit_price||0)*Number((r.net_weight != null ? r.net_weight : r.weight)||0))), Trạng_thái:r.payment_status }))
+      const sPend = (Array.isArray(sales) ? sales : []).filter(r => String(r.payment_status)==='pending').map(r => ({ Loại:'Thu', Ngày:r.sale_date, Đối_tác:r.customer_name||'', Tổng_tiền:Number(r.total_amount|| (Number(r.price_per_kg||0)*Number(r.weight||0))), Trạng_thái:r.payment_status }))
+      const pPend = (Array.isArray(purchases) ? purchases : []).filter(r => String(r.payment_status)==='pending').map(r => ({ Loại:'Chi', Ngày:r.purchase_date, Đối_tác:r.supplier_name||'', Tổng_tiền:Number(r.total_cost|| (Number(r.unit_price||0)*Number((r.net_weight != null ? r.net_weight : r.weight)||0))), Trạng_thái:r.payment_status }))
       const rows = [...sPend, ...pPend]
       const cols = ['Loại','Ngày','Đối_tác','Tổng_tiền','Trạng_thái']
       return { rows, cols }
@@ -93,7 +93,7 @@ export default function Stats() {
     if (reportType === 'season_purchase') {
       const monthsSet = new Set(seasonMonths.map(m=>String(m)))
       const rowsMap = new Map()
-      purchases.forEach(r => { const m = Number(String(r.purchase_date||'').split('-')[1]||'0'); if (!monthsSet.has(String(m))) return; const key = String(m).padStart(2,'0'); const prev = rowsMap.get(key) || { Tháng:key, Số_vụ:0, Kg:0, Tổng_tiền:0 }
+      ;(Array.isArray(purchases) ? purchases : []).forEach(r => { const m = Number(String(r.purchase_date||'').split('-')[1]||'0'); if (!monthsSet.has(String(m))) return; const key = String(m).padStart(2,'0'); const prev = rowsMap.get(key) || { Tháng:key, Số_vụ:0, Kg:0, Tổng_tiền:0 }
         rowsMap.set(key, { Tháng:key, Số_vụ: prev.Số_vụ+1, Kg: prev.Kg + Number((r.net_weight != null ? r.net_weight : r.weight) || 0), Tổng_tiền: prev.Tổng_tiền + Number(r.total_cost || (Number(r.unit_price||0)*Number((r.net_weight != null ? r.net_weight : r.weight)||0))) })
       })
       const rows = Array.from(rowsMap.values()).sort((a,b)=> a.Tháng.localeCompare(b.Tháng))
@@ -102,9 +102,9 @@ export default function Stats() {
     }
     if (reportType === 'tea_profit') {
       const byTea = new Map()
-      const totalSales = sales.reduce((s,r)=> s + (Number(r.total_amount != null ? r.total_amount : (Number(r.price_per_kg||0)*Number(r.weight||0)))||0), 0)
-      const totalCosts = purchases.reduce((s,r)=> s + (Number(r.total_cost != null ? r.total_cost : (Number(r.unit_price||0)*Number((r.net_weight != null ? r.net_weight : r.weight)||0)))||0), 0) + expenses.reduce((s,r)=> s + (Number(r.amount)||0), 0)
-      sales.forEach(r => { const tea = r.tea_type || 'Khác'; const rev = Number(r.total_amount|| (Number(r.price_per_kg||0)*Number(r.weight||0))); const prev = byTea.get(tea) || { Loại_chè: tea, Doanh_thu: 0, Số_vụ: 0, Kg: 0 }
+      const totalSales = (Array.isArray(sales) ? sales : []).reduce((s,r)=> s + (Number(r.total_amount != null ? r.total_amount : (Number(r.price_per_kg||0)*Number(r.weight||0)))||0), 0)
+      const totalCosts = (Array.isArray(purchases) ? purchases : []).reduce((s,r)=> s + (Number(r.total_cost != null ? r.total_cost : (Number(r.unit_price||0)*Number((r.net_weight != null ? r.net_weight : r.weight)||0)))||0), 0) + (Array.isArray(expenses) ? expenses : []).reduce((s,r)=> s + (Number(r.amount)||0), 0)
+      ;(Array.isArray(sales) ? sales : []).forEach(r => { const tea = r.tea_type || 'Khác'; const rev = Number(r.total_amount|| (Number(r.price_per_kg||0)*Number(r.weight||0))); const prev = byTea.get(tea) || { Loại_chè: tea, Doanh_thu: 0, Số_vụ: 0, Kg: 0 }
         byTea.set(tea, { Loại_chè: tea, Doanh_thu: prev.Doanh_thu + rev, Số_vụ: prev.Số_vụ + 1, Kg: prev.Kg + Number(r.weight||0) })
       })
       const rows = Array.from(byTea.values()).map(r => { const share = totalSales>0 ? (r.Doanh_thu/totalSales) : 0; const costAlloc = share * totalCosts; const profit = r.Doanh_thu - costAlloc; return { ...r, Chi_phí_phân_bổ: costAlloc, Lợi_nhuận: profit } })

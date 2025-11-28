@@ -53,12 +53,12 @@ export default function Dashboard() {
         api.get('/stats', { params })
       ]);
 
-      const salesData = sRes.status === 'fulfilled' ? (sRes.value.data || []) : [];
-      const purchasesData = pRes.status === 'fulfilled' ? (pRes.value.data || []) : [];
-      const expensesData = eRes.status === 'fulfilled' ? (eRes.value.data || []) : [];
-      const prevSalesData = sPrevRes.status === 'fulfilled' ? (sPrevRes.value.data || []) : [];
-      const prevPurchasesData = pPrevRes.status === 'fulfilled' ? (pPrevRes.value.data || []) : [];
-      const prevExpensesData = ePrevRes.status === 'fulfilled' ? (ePrevRes.value.data || []) : [];
+      const salesData = sRes.status === 'fulfilled' ? (Array.isArray(sRes.value.data) ? sRes.value.data : []) : [];
+      const purchasesData = pRes.status === 'fulfilled' ? (Array.isArray(pRes.value.data) ? pRes.value.data : []) : [];
+      const expensesData = eRes.status === 'fulfilled' ? (Array.isArray(eRes.value.data) ? eRes.value.data : []) : [];
+      const prevSalesData = sPrevRes.status === 'fulfilled' ? (Array.isArray(sPrevRes.value.data) ? sPrevRes.value.data : []) : [];
+      const prevPurchasesData = pPrevRes.status === 'fulfilled' ? (Array.isArray(pPrevRes.value.data) ? pPrevRes.value.data : []) : [];
+      const prevExpensesData = ePrevRes.status === 'fulfilled' ? (Array.isArray(ePrevRes.value.data) ? ePrevRes.value.data : []) : [];
       const statsData = statsRes.status === 'fulfilled' ? (statsRes.value.data || {}) : {}
 
       let s = salesData, p = purchasesData, e = expensesData;
@@ -75,10 +75,21 @@ export default function Dashboard() {
       setPrevSales(prevSalesData);
       setPrevPurchases(prevPurchasesData);
       setPrevExpenses(prevExpensesData);
-      setTops({ buyers_top: statsData.buyers_top || [], suppliers_top: statsData.suppliers_top || [] })
+      setTops({ buyers_top: Array.isArray(statsData.buyers_top) ? statsData.buyers_top : [], suppliers_top: Array.isArray(statsData.suppliers_top) ? statsData.suppliers_top : [] })
 
       if (aggRes.status === 'fulfilled' && selectedDay === 'all') {
-        setTotals(aggRes.value.data || { totalSales: 0, totalPurchases: 0, totalExpenses: 0, netProfit: 0, variableCost: 0, fixedExpense: 0, variablePct: 0, fixedPct: 0, profitMarginPct: 0 });
+        const d = aggRes.value.data || {}
+        setTotals({
+          totalSales: Number(d.totalSales)||0,
+          totalPurchases: Number(d.totalPurchases)||0,
+          totalExpenses: Number(d.totalExpenses)||0,
+          netProfit: Number(d.netProfit)||0,
+          variableCost: Number(d.variableCost)||0,
+          fixedExpense: Number(d.fixedExpense)||0,
+          variablePct: Number(d.variablePct)||0,
+          fixedPct: Number(d.fixedPct)||0,
+          profitMarginPct: Number(d.profitMarginPct)||0,
+        });
       } else {
         const fallbackSales = (selectedDay==='all' ? salesData : s).reduce((sum, r) => sum + (Number(r.total_amount) || 0), 0);
         const fallbackPurchases = (selectedDay==='all' ? purchasesData : p).reduce((sum, r) => sum + (Number(r.total_cost) || 0), 0);
@@ -111,7 +122,7 @@ export default function Dashboard() {
   };
 
   useEffect(() => { load(); }, [month, year, selectedDay]);
-  useEffect(() => { (async () => { try { const r = await api.get('/notifications'); setNotifs(r.data||[]) } catch {} })() }, [month, year])
+  useEffect(() => { (async () => { try { const r = await api.get('/notifications'); setNotifs(Array.isArray(r.data) ? r.data : []) } catch {} })() }, [month, year])
 
   useEffect(() => {
     const dim = new Date(year, month, 0).getDate();

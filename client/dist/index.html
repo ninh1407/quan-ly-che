@@ -1,19 +1,53 @@
+
 <!doctype html>
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Quản lý Chè</title>
+    <meta name="theme-color" content="#8a5a2f" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/leaf-180.png" />
+    <link rel="icon" href="/icons/leaf.svg" type="image/svg+xml" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Quản lý Chè" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&family=Noto+Serif:wght@400;700&family=Cormorant+Garamond:wght@500;700&display=swap" rel="stylesheet">
     <style>
       html, body { font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
       [data-theme="wood"] h1 { font-family: 'Playfair Display', 'Noto Serif', serif; letter-spacing:.3px; }
       [data-theme="wood"] .hero-title { font-family: 'Cormorant Garamond', 'Playfair Display', serif; letter-spacing:.3px; }
     </style>
-    <script type="module" crossorigin src="/assets/index-BKSERf54.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-CU_KcEqK.css">
+    <script type="module" crossorigin src="/assets/index.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index.css">
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function(){
+        try {
+          var ver = 'v4-2025-11-28-01';
+          var key = 'app_version';
+          var old = localStorage.getItem(key);
+          if (old !== ver) {
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function(rs){ rs.forEach(function(r){ r.unregister() }) })
+            }
+            if (window.caches && window.caches.keys) {
+              caches.keys().then(function(ks){ ks.forEach(function(k){ caches.delete(k) }) })
+            }
+            localStorage.setItem(key, ver);
+          }
+          // Tạm thời tắt đăng ký Service Worker để tránh trắng trang khi demo
+          // (đã có cơ chế tự gỡ cache theo phiên bản ở trên)
+          // Nếu cần bật lại, đổi điều kiện dưới đây thành true.
+          if (false && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+            if ('serviceWorker' in navigator) {
+              window.addEventListener('load', function(){ navigator.serviceWorker.register('/sw.js') })
+            }
+          }
+        } catch {}
+      })();
+    </script>
   </body>
 </html>

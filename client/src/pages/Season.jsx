@@ -104,28 +104,29 @@ export default function Season() {
 
   // Áp dụng bộ lọc vào dữ liệu
   const filteredSales = useMemo(() => {
-    return sales.filter(r => {
+    const arr = Array.isArray(sales) ? sales : []
+    return arr.filter(r => {
       const okTea = teaTypeFilter ? String(r.tea_type || '').toLowerCase().includes(teaTypeFilter.toLowerCase()) : true;
       const okCust = customerFilter ? String(r.customer_name || '').toLowerCase().includes(customerFilter.toLowerCase()) : true;
       return okTea && okCust;
     });
   }, [sales, teaTypeFilter, customerFilter]);
   const filteredPurchases = useMemo(() => {
-    return purchases.filter(r => {
+    const arr = Array.isArray(purchases) ? purchases : []
+    return arr.filter(r => {
       const okSupp = supplierFilter ? String(r.supplier_name || '').toLowerCase().includes(supplierFilter.toLowerCase()) : true;
       return okSupp;
     });
   }, [purchases, supplierFilter]);
-
-  const totalSales = useMemo(() => filteredSales.reduce((sum, r) => sum + (Number(r.total_amount) || 0), 0), [filteredSales]);
-  const totalPurchases = useMemo(() => filteredPurchases.reduce((sum, r) => sum + (Number(r.total_cost) || 0), 0), [filteredPurchases]);
-  const totalExpenses = useMemo(() => expenses.reduce((sum, r) => sum + (Number(r.amount) || 0), 0), [expenses]);
+  const totalSales = useMemo(() => (Array.isArray(filteredSales) ? filteredSales : []).reduce((sum, r) => sum + (Number(r.total_amount) || 0), 0), [filteredSales]);
+  const totalPurchases = useMemo(() => (Array.isArray(filteredPurchases) ? filteredPurchases : []).reduce((sum, r) => sum + (Number(r.total_cost) || 0), 0), [filteredPurchases]);
+  const totalExpenses = useMemo(() => (Array.isArray(expenses) ? expenses : []).reduce((sum, r) => sum + (Number(r.amount) || 0), 0), [expenses]);
   const netProfit = useMemo(() => totalSales - totalPurchases - totalExpenses, [totalSales, totalPurchases, totalExpenses]);
 
   // Ranking suppliers (farmers) by total weight and amount within the season
   const supplierStats = useMemo(() => {
     const map = new Map();
-    for (const r of filteredPurchases) {
+    for (const r of (Array.isArray(filteredPurchases) ? filteredPurchases : [])) {
       const key = r.supplier_name || 'Không rõ';
       const prev = map.get(key) || { supplier_name: key, total_weight: 0, total_amount: 0, transactions: 0 };
       prev.total_weight += Number(r.weight) || 0;
@@ -141,7 +142,7 @@ export default function Season() {
   // Ranking customers by total weight/amount within the season (sales side)
   const customerStats = useMemo(() => {
     const map = new Map();
-    for (const r of filteredSales) {
+    for (const r of (Array.isArray(filteredSales) ? filteredSales : [])) {
       const key = r.customer_name || 'Không rõ';
       const prev = map.get(key) || { customer_name: key, total_weight: 0, total_amount: 0, transactions: 0 };
       prev.total_weight += Number(r.weight) || 0;
@@ -157,7 +158,7 @@ export default function Season() {
   // Công nợ theo khách hàng (Thu)
   const customerDebtStats = useMemo(() => {
     const map = new Map();
-    for (const r of filteredSales) {
+    for (const r of (Array.isArray(filteredSales) ? filteredSales : [])) {
       const key = r.customer_name || 'Không rõ';
       const prev = map.get(key) || { customer_name: key, transactions: 0, total_amount: 0, paid_amount: 0, pending_amount: 0 };
       const amount = Number(r.total_amount) || 0;
@@ -174,7 +175,7 @@ export default function Season() {
   // Công nợ theo nhà vườn (Nhập)
   const supplierDebtStats = useMemo(() => {
     const map = new Map();
-    for (const r of filteredPurchases) {
+    for (const r of (Array.isArray(filteredPurchases) ? filteredPurchases : [])) {
       const key = r.supplier_name || 'Không rõ';
       const prev = map.get(key) || { supplier_name: key, transactions: 0, total_amount: 0, paid_amount: 0, pending_amount: 0 };
       const amount = Number(r.total_cost) || 0;
@@ -195,16 +196,19 @@ export default function Season() {
 
   // Biểu đồ theo tháng trong đợt
   const monthlyData = useMemo(() => {
+    const fs = Array.isArray(filteredSales) ? filteredSales : []
+    const fp = Array.isArray(filteredPurchases) ? filteredPurchases : []
+    const ex = Array.isArray(expenses) ? expenses : []
     const arr = seasonMonths.map(({ month, year }) => {
-      const s = filteredSales.filter(r => {
+      const s = fs.filter(r => {
         const d = new Date(r.sale_date);
         return (d.getMonth() + 1) === month && d.getFullYear() === year;
       }).reduce((sum, r) => sum + (Number(r.total_amount) || 0), 0);
-      const p = filteredPurchases.filter(r => {
+      const p = fp.filter(r => {
         const d = new Date(r.purchase_date);
         return (d.getMonth() + 1) === month && d.getFullYear() === year;
       }).reduce((sum, r) => sum + (Number(r.total_cost) || 0), 0);
-      const e = expenses.filter(r => {
+      const e = ex.filter(r => {
         const d = new Date(r.expense_date);
         return (d.getMonth() + 1) === month && d.getFullYear() === year;
       }).reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
