@@ -150,9 +150,10 @@ export default function App() {
   return (
       <div className="container">
       {isMobile && (
-        <div className="mobile-toolbar" style={{ justifyContent:'space-between' }}>
+        <div className="mobile-toolbar" style={{ display:'flex', justifyContent:'space-between' }}>
           <div style={{ display:'flex', gap:8 }}>
-            {/* optional: keep compact buttons inside dropdown only */}
+            <button className="btn" onClick={() => setMenuOpen(true)}>☰ Menu</button>
+            <button className="btn" onClick={() => setTheme(theme === 'light' ? 'dark' : (theme==='dark' ? 'tea' : (theme==='tea' ? 'wood' : 'light')))}>{theme === 'light' ? '🌙 Tối' : (theme==='dark' ? '🍵 Nâu – Xanh lá' : (theme==='tea' ? '🪵 Gỗ truyền thống' : '☀️ Sáng'))}</button>
           </div>
           <details className="dropdown">
             <summary className="btn avatar"><span className="circle">{(localStorage.getItem('username')||'N')[0].toUpperCase()}</span> {(localStorage.getItem('username')||'Người dùng')} ▾</summary>
@@ -162,7 +163,6 @@ export default function App() {
               <button className="btn" onClick={() => setSettingsOpen(true)}>Cài đặt</button>
               {installEvt && <button className="btn" onClick={installApp}>Cài đặt App</button>}
               {isIOS && <button className="btn" onClick={() => setIosGuideOpen(true)}>Cài trên iPhone</button>}
-              <button className="btn" onClick={() => setTheme(theme === 'light' ? 'dark' : (theme==='dark' ? 'tea' : (theme==='tea' ? 'wood' : 'light')))}>{theme === 'light' ? '🌙 Tối' : (theme==='dark' ? '🍵 Nâu – Xanh lá' : (theme==='tea' ? '🪵 Gỗ truyền thống' : '☀️ Sáng'))}</button>
               <button className="btn" onClick={() => setTab('changePwd')}>Đổi mật khẩu</button>
               <button className="btn" onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('role'); setAuthed(false) }}>Đăng xuất</button>
             </div>
