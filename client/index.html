@@ -4,6 +4,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>Quản lý Chè</title>
     <meta name="theme-color" content="#8a5a2f" />
     <link rel="manifest" href="/manifest.webmanifest" />
@@ -22,11 +25,15 @@
   <body>
     <div id="root"></div>
     <div id="orientation-overlay"><div class="card" style="max-width:520px;text-align:center"><div style="font-weight:700;margin-bottom:8px">Vui lòng quay ngang điện thoại</div><div class="muted">Ứng dụng yêu cầu chế độ ngang để hiển thị đầy đủ.</div></div></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module">
+      const ver = 'v5-2025-11-28-02'
+      window.APP_VER = ver
+      import(`/src/main.jsx?v=${ver}`)
+    </script>
     <script>
       (function(){
         try {
-          var ver = 'v4-2025-11-28-01';
+          var ver = window.APP_VER || 'v5-2025-11-28-02';
           var key = 'app_version';
           var old = localStorage.getItem(key);
           if (old !== ver) {
@@ -37,6 +44,7 @@
               caches.keys().then(function(ks){ ks.forEach(function(k){ caches.delete(k) }) })
             }
             localStorage.setItem(key, ver);
+            try { location.reload(true) } catch { location.reload() }
           }
           // Tạm thời tắt đăng ký Service Worker để tránh trắng trang khi demo
           // (đã có cơ chế tự gỡ cache theo phiên bản ở trên)
@@ -47,6 +55,7 @@
             }
           }
           try { if (screen && screen.orientation && screen.orientation.lock) { screen.orientation.lock('landscape').catch(function(){}) } } catch {}
+          try { window.addEventListener('focus', function(){ if (navigator.onLine) { try { location.reload(true) } catch { location.reload() } } }) } catch {}
           try {
             var overlay = document.getElementById('orientation-overlay');
             var isMobileUA = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');
