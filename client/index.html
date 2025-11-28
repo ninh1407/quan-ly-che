@@ -74,14 +74,9 @@
                 var cv = localStorage.getItem('app_version');
                 if (sv && sv !== cv) {
                   localStorage.setItem('app_version', sv);
-                  var banner = document.getElementById('update-banner');
-                  var btn = document.getElementById('update-reload');
-                  if (banner) banner.classList.add('show');
-                  if (btn) btn.onclick = function(){
-                    if ('serviceWorker' in navigator) { navigator.serviceWorker.getRegistrations().then(function(rs){ rs.forEach(function(r){ r.unregister() }) }) }
-                    if (window.caches && window.caches.keys) { caches.keys().then(function(ks){ ks.forEach(function(k){ caches.delete(k) }) }) }
-                    try { location.reload(true) } catch { location.reload() }
-                  };
+                  if ('serviceWorker' in navigator) { navigator.serviceWorker.getRegistrations().then(function(rs){ rs.forEach(function(r){ r.unregister() }) }) }
+                  if (window.caches && window.caches.keys) { caches.keys().then(function(ks){ ks.forEach(function(k){ caches.delete(k) }) }) }
+                  try { location.reload(true) } catch { location.reload() }
                 }
               }).catch(function(){})
             };
