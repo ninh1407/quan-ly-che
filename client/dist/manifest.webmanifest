@@ -1,0 +1,14 @@
+{
+  "name": "Quản lý Chè",
+  "short_name": "Quản lý Chè",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f1e6",
+  "theme_color": "#8a5a2f",
+  "icons": [
+    { "src": "/icons/leaf.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any maskable" },
+    { "src": "/icons/leaf-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any maskable" },
+    { "src": "/icons/leaf-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any maskable" }
+  ]
+}
