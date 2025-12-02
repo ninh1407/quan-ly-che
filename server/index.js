@@ -2665,7 +2665,17 @@ app.post('/admin/migrate/sqlite-to-mongo', rateLimit(60_000, 5, 'migrate_sqlite_
 })
 
 app.get('/health', (req, res) => {
-  res.json({ ok: true, mongo: !!MONGO_READY });
+  const info = { ok: true, mongo: !!MONGO_READY }
+  if (SQLITE_READY) {
+    try {
+      db.get(`PRAGMA integrity_check`, [], (e, row) => {
+        info.sqlite = { ready: true, integrity: String(row?.integrity_check||row?.result||'ok') }
+        res.json(info)
+      })
+    } catch { res.json({ ...info, sqlite: { ready: true } }) }
+  } else {
+    res.json(info)
+  }
 });
 
 // App version endpoint for client auto-refresh
@@ -3699,5 +3709,19 @@ app.post('/auth/2fa/disable', rateLimit(60_000, 5, 'admin'), requireAdmin, async
     const sec = String(row?.twofa_secret||'')
     if (sec && (!otp || !authenticator.verify({ token:String(otp), secret:sec }))) return res.status(401).json({ message:'Invalid OTP' })
     db.run(`UPDATE users SET twofa_secret = '', twofa_enabled = 0 WHERE id = ?`, [Number(req.user.uid)], function(err){ if (err) return res.status(500).json({ message:'DB error' }); res.json({ disabled:this.changes }) })
+  })
+})
+app.get('/admin/db-check', requireAdmin, (req, res) => {
+  const out = { sqlite: { ready: SQLITE_READY }, mongo: { ready: !!MONGO_READY } }
+  if (!SQLITE_READY) return res.json(out)
+  db.get(`PRAGMA integrity_check`, [], (e, integ) => {
+    out.sqlite.integrity = e ? 'error' : String(integ?.integrity_check||integ?.result||'ok')
+    db.get(`SELECT COUNT(*) AS c FROM users`, [], (e2, cnt) => {
+      out.sqlite.users = e2 ? -1 : Number(cnt?.c||0)
+      db.all(`PRAGMA table_info(users)`, [], (e3, cols) => {
+        out.sqlite.columns = Array.isArray(cols) ? cols.map(c => c.name) : []
+        res.json(out)
+      })
+    })
   })
 })
