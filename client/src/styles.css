@@ -377,3 +377,19 @@ html{scroll-behavior:smooth; background: var(--bg)}
   .table th,.table td{padding:8px}
   .chart-card{height:200px}
 }
+/* Responsive layout upgrade */
+:root{ --header-h-pc:56px; --tabs-h-pc:44px; --header-h-mobile:44px; --tabs-h-mobile:40px }
+
+[data-device="pc"] .breadcrumb{position:sticky;top:0;left:0;right:0;padding:8px 12px;background:var(--bg);z-index:10000;border-bottom:1px solid var(--border)}
+[data-device="pc"] .tabs{position:sticky;top:var(--header-h-pc);left:0;right:0;min-height:var(--tabs-h-pc);gap:8px;padding:6px 12px;background:var(--bg);z-index:10000;border-bottom:1px solid var(--border)}
+[data-device="pc"] .container{padding-top:calc(var(--header-h-pc) + var(--tabs-h-pc) + 8px)}
+[data-device="pc"] .sidebar{top:calc(var(--header-h-pc) + var(--tabs-h-pc) + 8px)}
+
+[data-device="mobile"] .mobile-toolbar{position:fixed;top:calc(env(safe-area-inset-top, 0px));left:0;right:0;min-height:var(--header-h-mobile);padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--border);z-index:10000}
+[data-device="mobile"] .tabs{position:fixed;top:calc(env(safe-area-inset-top, 0px) + var(--header-h-mobile));left:0;right:0;min-height:var(--tabs-h-mobile);gap:6px;padding:6px 10px;background:var(--surface);border-bottom:1px solid var(--border);z-index:10000}
+[data-device="mobile"] .container{padding-top:calc(var(--header-h-mobile) + var(--tabs-h-mobile) + 12px + env(safe-area-inset-top, 0px))}
+[data-device="mobile"] .tabs .btn,[data-device="mobile"] .hamburger-btn{padding:10px 14px;font-size:15px}
+[data-device="mobile"] .hero{display:block}
+
+/* Compact top spacing for hero card on both devices */
+.hero{margin-top:8px}
