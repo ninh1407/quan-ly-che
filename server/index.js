@@ -4,8 +4,9 @@ let sqlite3 = null;
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { MongoClient } = require('mongodb');
-const { authenticator } = require('otplib');
-const qrcode = require('qrcode');
+let authenticator = null; let OTP_AVAILABLE = false;
+try { ({ authenticator } = require('otplib')); OTP_AVAILABLE = !!authenticator } catch {}
+let qrcode = null; try { qrcode = require('qrcode') } catch {}
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -3057,7 +3058,8 @@ app.post('/auth/login', rateLimit(60_000, 5, 'login'), (req, res) => {
       if (!ok) { onLoginFail(username); mongoDb.collection('security_logs').insertOne({ ts: new Date().toISOString(), username, success: 0, ip, ua, city: '', note: 'login_fail' }).catch(()=>{}); return res.status(401).json({ message: 'Invalid credentials' }); }
       // 2FA if enabled
       const otp = b.otp ?? q.otp
-      if (String(row.twofa_enabled||0) === '1') {
+      const need2fa = String(row.twofa_enabled||0) === '1' && OTP_AVAILABLE
+      if (need2fa) {
         if (!otp || !authenticator.verify({ token: String(otp), secret: String(row.twofa_secret||'') })) {
           return res.status(401).json({ message:'OTP required', otp_required:true })
         }
@@ -3080,7 +3082,8 @@ app.post('/auth/login', rateLimit(60_000, 5, 'login'), (req, res) => {
     if (!ok) { onLoginFail(username); db.run(`INSERT INTO security_logs (ts, username, success, ip, ua, city, note) VALUES (?,?,?,?,?,?,?)`, [new Date().toISOString(), username, 0, ip, ua, '', 'login_fail'], () => {}); return res.status(401).json({ message: 'Invalid credentials' }); }
     // 2FA if enabled
     const otp = b.otp ?? q.otp
-    if (Number(row.twofa_enabled||0) === 1) {
+    const need2fa = Number(row.twofa_enabled||0) === 1 && OTP_AVAILABLE
+    if (need2fa) {
       if (!otp || !authenticator.verify({ token: String(otp), secret: String(row.twofa_secret||'') })) {
         return res.status(401).json({ message:'OTP required', otp_required:true })
       }
@@ -3679,6 +3682,7 @@ function onLoginFail(username){
 function onLoginSuccess(username){ LOGIN_FAIL.delete(String(username||'')) }
 // 2FA setup (admin only)
 app.post('/auth/2fa/setup', rateLimit(60_000, 5, 'admin'), requireAdmin, async (req, res) => {
+  if (!OTP_AVAILABLE) return res.status(501).json({ message:'2FA module not installed' })
   try {
     const user = String(req.user?.username||'')
     const secret = authenticator.generateSecret()
@@ -3690,6 +3694,7 @@ app.post('/auth/2fa/setup', rateLimit(60_000, 5, 'admin'), requireAdmin, async (
 })
 
 app.post('/auth/2fa/enable', rateLimit(60_000, 5, 'admin'), requireAdmin, async (req, res) => {
+  if (!OTP_AVAILABLE) return res.status(501).json({ message:'2FA module not installed' })
   const { otp, secret } = req.body || {}
   if (!otp || !secret) return res.status(400).json({ message:'Missing otp/secret' })
   const ok = authenticator.verify({ token:String(otp), secret:String(secret) })
