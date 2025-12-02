@@ -5,6 +5,7 @@ import api from '../api.js'
 export default function Login({ onSuccess, onLogout }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [otp, setOtp] = useState('')
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
 
@@ -30,7 +31,7 @@ export default function Login({ onSuccess, onLogout }) {
   const onLogin = async (e) => {
     e.preventDefault(); setError(''); setInfo('')
     try {
-      const res = await api.post('/auth/login', { username, password })
+      const res = await api.post('/auth/login', { username, password, otp })
       const { token, roles, role } = res.data || {}
       if (!token) throw new Error('No token')
       localStorage.setItem('token', token)
@@ -40,7 +41,8 @@ export default function Login({ onSuccess, onLogout }) {
       setInfo(`Đăng nhập thành công: quyền ${(Array.isArray(roles)?roles.join(','): (role||'user'))}`)
       if (typeof onSuccess === 'function') onSuccess()
     } catch (e) {
-      setError(e?.response?.data?.message || 'Đăng nhập lỗi')
+      const msg = e?.response?.data?.message || 'Đăng nhập lỗi'
+      setError(msg === 'OTP required' ? 'Vui lòng nhập mã OTP từ ứng dụng xác thực' : msg)
     }
   }
 
@@ -69,6 +71,10 @@ export default function Login({ onSuccess, onLogout }) {
           <div className="field">
             <label>Mật khẩu</label>
             <div className="input-icon"><span className="icon">🔒</span><input placeholder="••••••••" type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+          </div>
+          <div className="field">
+            <label>Mã OTP (nếu đã bật 2FA)</label>
+            <div className="input-icon"><span className="icon">🔢</span><input placeholder="123456" value={otp} onChange={(e) => setOtp(e.target.value)} /></div>
           </div>
           {error && <div className="error">{error}</div>}
           {info && <div className="muted">{info}</div>}

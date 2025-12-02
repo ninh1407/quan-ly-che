@@ -4,12 +4,18 @@ let sqlite3 = null;
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { MongoClient } = require('mongodb');
+const { authenticator } = require('otplib');
+const qrcode = require('qrcode');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 
 const app = express();
+const helmet = require('helmet');
+app.disable('x-powered-by')
+app.set('trust proxy', 1)
+app.use(helmet({ contentSecurityPolicy: false, hsts: false }))
 app.disable('x-powered-by')
 const BACKUPS_DIR = process.env.BACKUPS_DIR || path.join(__dirname, 'backups');
 const ALLOWED_ORIGIN = process.env.CORS_ORIGIN || ''
@@ -26,6 +32,10 @@ app.use((req, res, next) => {
 })
 const ENABLE_HSTS = String(process.env.ENABLE_HSTS||'').toLowerCase()==='true'
 const CSP = process.env.CSP || "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'";
+const ENFORCE_HTTPS = String(process.env.ENFORCE_HTTPS||'').toLowerCase()==='true'
+if (ENFORCE_HTTPS) {
+  app.use((req,res,next)=>{ if (!req.secure) return res.redirect('https://'+req.headers.host+req.originalUrl); next() })
+}
 app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY')
   res.setHeader('X-Content-Type-Options', 'nosniff')
@@ -72,6 +82,16 @@ if (SQLITE_READY) {
   db.exec('PRAGMA busy_timeout = 3000');
   try {
     // Indexes will be created after tables are ensured below
+  } catch {}
+  // ensure 2FA columns exist
+  try {
+    db.all(`PRAGMA table_info(users)`, [], (e, cols) => {
+      if (e || !Array.isArray(cols)) return
+      const names = cols.map(c => c.name)
+      if (!names.includes('twofa_secret')) { try { db.run(`ALTER TABLE users ADD COLUMN twofa_secret TEXT`) } catch {} }
+      if (!names.includes('twofa_enabled')) { try { db.run(`ALTER TABLE users ADD COLUMN twofa_enabled INTEGER DEFAULT 0`) } catch {} }
+      if (!names.includes('session_id')) { try { db.run(`ALTER TABLE users ADD COLUMN session_id TEXT`) } catch {} }
+    })
   } catch {}
 }
 
@@ -2926,6 +2946,12 @@ function hasRole(req, name) {
 function requireAdmin(req, res, next) {
   requireAuth(req, res, () => {
     if (!hasRole(req, 'admin')) return res.status(403).json({ message: 'Forbidden: admin required' });
+    const ips = String(process.env.ADMIN_IPS||'').split(',').map(s=>s.trim()).filter(Boolean)
+    if (ips.length) {
+      const remote = String((req.headers['x-forwarded-for']||'').toString().split(',')[0] || req.socket?.remoteAddress || '')
+      const ok = ips.some(ip => remote.includes(ip))
+      if (!ok) return res.status(403).json({ message:'Forbidden: admin IP' })
+    }
     next();
   });
 }
@@ -3012,11 +3038,18 @@ app.post('/auth/login', rateLimit(60_000, 5, 'login'), (req, res) => {
       if (!row) return res.status(401).json({ message: 'Invalid credentials' });
       const ok = bcrypt.compareSync(password, row.password_hash || '');
       if (!ok) { onLoginFail(username); mongoDb.collection('security_logs').insertOne({ ts: new Date().toISOString(), username, success: 0, ip, ua, city: '', note: 'login_fail' }).catch(()=>{}); return res.status(401).json({ message: 'Invalid credentials' }); }
+      // 2FA if enabled
+      const otp = b.otp ?? q.otp
+      if (String(row.twofa_enabled||0) === '1') {
+        if (!otp || !authenticator.verify({ token: String(otp), secret: String(row.twofa_secret||'') })) {
+          return res.status(401).json({ message:'OTP required', otp_required:true })
+        }
+      }
       const roles = Array.isArray(row.role) ? row.role : String(row.role || 'user').split(',').map(s=>s.trim()).filter(Boolean);
       if (roles.includes('user_disabled') || roles.includes('disabled')) return res.status(403).json({ message: 'Account disabled' })
       const sid = crypto.randomBytes(16).toString('hex');
       mongoDb.collection('users').updateOne({ id: row.id }, { $set: { session_id: sid } }).catch(()=>{})
-      const token = jwt.sign({ uid: row.id, username: row.username, roles, sid }, JWT_SECRET, { expiresIn: '1d' });
+      const token = jwt.sign({ uid: row.id, username: row.username, roles, sid }, JWT_SECRET, { expiresIn: '12h' });
       onLoginSuccess(username)
       res.json({ token, roles });
       mongoDb.collection('security_logs').insertOne({ ts: new Date().toISOString(), username, success: 1, ip, ua, city: '', note: 'login' }).catch(()=>{})
@@ -3028,11 +3061,18 @@ app.post('/auth/login', rateLimit(60_000, 5, 'login'), (req, res) => {
     if (!row) return res.status(401).json({ message: 'Invalid credentials' });
     const ok = bcrypt.compareSync(password, row.password_hash || '');
     if (!ok) { onLoginFail(username); db.run(`INSERT INTO security_logs (ts, username, success, ip, ua, city, note) VALUES (?,?,?,?,?,?,?)`, [new Date().toISOString(), username, 0, ip, ua, '', 'login_fail'], () => {}); return res.status(401).json({ message: 'Invalid credentials' }); }
+    // 2FA if enabled
+    const otp = b.otp ?? q.otp
+    if (Number(row.twofa_enabled||0) === 1) {
+      if (!otp || !authenticator.verify({ token: String(otp), secret: String(row.twofa_secret||'') })) {
+        return res.status(401).json({ message:'OTP required', otp_required:true })
+      }
+    }
     const roles = String(row.role || 'user').split(',').map(s=>s.trim()).filter(Boolean);
     if (roles.includes('user_disabled') || roles.includes('disabled')) return res.status(403).json({ message: 'Account disabled' })
     const sid = crypto.randomBytes(16).toString('hex');
     db.run(`UPDATE users SET session_id = ? WHERE id = ?`, [sid, row.id], () => {});
-    const token = jwt.sign({ uid: row.id, username: row.username, roles, sid }, JWT_SECRET, { expiresIn: '1d' });
+    const token = jwt.sign({ uid: row.id, username: row.username, roles, sid }, JWT_SECRET, { expiresIn: '12h' });
     onLoginSuccess(username)
     res.json({ token, roles });
     db.run(`INSERT INTO security_logs (ts, username, success, ip, ua, city, note) VALUES (?,?,?,?,?,?,?)`, [new Date().toISOString(), username, 1, ip, ua, '', 'login'], () => {})
@@ -3620,3 +3660,41 @@ function onLoginFail(username){
   LOGIN_FAIL.set(u, it)
 }
 function onLoginSuccess(username){ LOGIN_FAIL.delete(String(username||'')) }
+// 2FA setup (admin only)
+app.post('/auth/2fa/setup', rateLimit(60_000, 5, 'admin'), requireAdmin, async (req, res) => {
+  try {
+    const user = String(req.user?.username||'')
+    const secret = authenticator.generateSecret()
+    const otpauth = authenticator.keyuri(user, 'QuanLyChe', secret)
+    let qr = ''
+    try { qr = await qrcode.toDataURL(otpauth) } catch {}
+    res.json({ secret, otpauth, qr })
+  } catch (e) { res.status(500).json({ message:'Setup error' }) }
+})
+
+app.post('/auth/2fa/enable', rateLimit(60_000, 5, 'admin'), requireAdmin, async (req, res) => {
+  const { otp, secret } = req.body || {}
+  if (!otp || !secret) return res.status(400).json({ message:'Missing otp/secret' })
+  const ok = authenticator.verify({ token:String(otp), secret:String(secret) })
+  if (!ok) return res.status(401).json({ message:'Invalid OTP' })
+  if (MONGO_READY) {
+    try { await mongoDb.collection('users').updateOne({ id:Number(req.user.uid) }, { $set: { twofa_secret:String(secret), twofa_enabled:1 } }); return res.json({ enabled:1 }) } catch { return res.status(500).json({ message:'DB error' }) }
+  }
+  if (!SQLITE_READY) return res.status(500).json({ message:'SQLite disabled' })
+  db.run(`UPDATE users SET twofa_secret = ?, twofa_enabled = 1 WHERE id = ?`, [String(secret), Number(req.user.uid)], function(err){ if (err) return res.status(500).json({ message:'DB error' }); res.json({ enabled:this.changes }) })
+})
+
+app.post('/auth/2fa/disable', rateLimit(60_000, 5, 'admin'), requireAdmin, async (req, res) => {
+  const { otp } = req.body || {}
+  // verify current OTP if secret exists
+  if (MONGO_READY) {
+    try { const u = await mongoDb.collection('users').findOne({ id:Number(req.user.uid) }); const sec = String(u?.twofa_secret||''); if (sec && (!otp || !authenticator.verify({ token:String(otp), secret:sec }))) return res.status(401).json({ message:'Invalid OTP' }); await mongoDb.collection('users').updateOne({ id:Number(req.user.uid) }, { $set: { twofa_secret:'', twofa_enabled:0 } }); return res.json({ disabled:1 }) } catch { return res.status(500).json({ message:'DB error' }) }
+  }
+  if (!SQLITE_READY) return res.status(500).json({ message:'SQLite disabled' })
+  db.get(`SELECT twofa_secret FROM users WHERE id = ?`, [Number(req.user.uid)], (e,row)=>{
+    if (e) return res.status(500).json({ message:'DB error' })
+    const sec = String(row?.twofa_secret||'')
+    if (sec && (!otp || !authenticator.verify({ token:String(otp), secret:sec }))) return res.status(401).json({ message:'Invalid OTP' })
+    db.run(`UPDATE users SET twofa_secret = '', twofa_enabled = 0 WHERE id = ?`, [Number(req.user.uid)], function(err){ if (err) return res.status(500).json({ message:'DB error' }); res.json({ disabled:this.changes }) })
+  })
+})
