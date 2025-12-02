@@ -74,6 +74,7 @@
             poll();
             setInterval(poll, 60000);
           } catch {}
+          try { if (location.protocol==='http:' && /duckdns\.org$/.test(location.hostname)) location.href = 'https://' + location.hostname + location.pathname + location.search } catch {}
         } catch {}
       })();
     </script>

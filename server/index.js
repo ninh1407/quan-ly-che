@@ -7,16 +7,16 @@ const { MongoClient } = require('mongodb');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 const app = express();
+app.disable('x-powered-by')
 const BACKUPS_DIR = process.env.BACKUPS_DIR || path.join(__dirname, 'backups');
 const ALLOWED_ORIGIN = process.env.CORS_ORIGIN || ''
 app.use((req, res, next) => {
   const origin = String(req.headers.origin || '')
-  if (ALLOWED_ORIGIN) {
-    if (origin && origin === ALLOWED_ORIGIN) res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN)
-  } else if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin)
+  if (ALLOWED_ORIGIN && origin === ALLOWED_ORIGIN) {
+    res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN)
   }
   res.setHeader('Access-Control-Allow-Credentials', 'true')
   res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
@@ -24,15 +24,26 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return res.status(200).end()
   next()
 })
+const ENABLE_HSTS = String(process.env.ENABLE_HSTS||'').toLowerCase()==='true'
+const CSP = process.env.CSP || "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'";
 app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY')
   res.setHeader('X-Content-Type-Options', 'nosniff')
   res.setHeader('Referrer-Policy', 'no-referrer')
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+  if (ENABLE_HSTS) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+  if (CSP) res.setHeader('Content-Security-Policy', CSP)
   next()
 })
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
+app.use((req, res, next) => {
+  const p = String(req.path || '')
+  if (p.startsWith('/auth') || p.startsWith('/admin')) {
+    res.setHeader('Cache-Control', 'no-store')
+  }
+  next()
+})
 try { if (!fs.existsSync('uploads')) fs.mkdirSync('uploads'); } catch {}
 app.use('/uploads', express.static('uploads'));
 try { if (!fs.existsSync('uploads_enc')) fs.mkdirSync('uploads_enc'); } catch {}
@@ -355,7 +366,7 @@ if (!MONGO_SKIP) {
       mongoDb.collection('users').findOne({ username: 'admin' }).then(u => {
         if (!u) {
           nextId('users').then(id => {
-            const hash = bcrypt.hashSync('admin123', 10);
+            const hash = bcrypt.hashSync('admin123', 12);
             mongoDb.collection('users').insertOne({ id, username: 'admin', password_hash: hash, role: 'admin' }).catch(() => {});
           });
         }
@@ -537,7 +548,7 @@ if (SQLITE_READY) db.serialize(() => {
     // Seed admin if not exists
     db.get(`SELECT id FROM users WHERE username = ?`, ['admin'], (e, u) => {
       if (!e && !u) {
-        const hash = bcrypt.hashSync('admin123', 10);
+        const hash = bcrypt.hashSync('admin123', 12);
         db.run(`INSERT INTO users (username, password_hash, role) VALUES (?,?,?)`, ['admin', hash, 'admin']);
         console.log('Seeded default admin: admin/admin123');
       }
@@ -2817,7 +2828,7 @@ app.get('/chat/users', requireAuth, (req, res) => {
 app.get('/admin/backups', requireAdmin, (req, res) => {
   try { res.json(backupSqliteList()) } catch (e) { res.status(500).json({ message: 'Lỗi tải danh sách bản sao lưu', detail: e.message }) }
 })
-app.post('/admin/backup', requireAdmin, async (req, res) => {
+app.post('/admin/backup', rateLimit(60_000, 5, 'admin'), requireAdmin, async (req, res) => {
   try { const name = MONGO_READY ? await backupMongoNow() : backupSqliteNow(); res.json({ name }) } catch (e) { res.status(500).json({ message: 'Lỗi tạo bản sao lưu', detail: e.message }) }
 })
 app.post('/admin/restore', requireAdmin, async (req, res) => {
@@ -2827,6 +2838,17 @@ app.post('/admin/restore', requireAdmin, async (req, res) => {
     if (String(name).endsWith('.json') && MONGO_READY) { await restoreMongo(String(name)); return res.json({ ok: true }) }
     restoreSqlite(String(name), (err) => { if (err) return res.status(500).json({ message: 'Khôi phục lỗi', detail: err.message }); res.json({ ok: true }) })
   } catch (e) { res.status(500).json({ message: 'Khôi phục lỗi', detail: e.message }) }
+})
+
+app.get('/admin/security-audit', requireAdmin, (req, res) => {
+  const hdrs = {
+    hsts: !!req.headers['strict-transport-security'],
+    csp: !!req.headers['content-security-policy'],
+    xfo: !!req.headers['x-frame-options'],
+    xcto: !!req.headers['x-content-type-options'],
+    referrer: !!req.headers['referrer-policy']
+  }
+  res.json({ headers: hdrs, cors_origin: ALLOWED_ORIGIN ? ALLOWED_ORIGIN : null, sqlite_ready: SQLITE_READY, mongo_ready: !!MONGO_READY })
 })
 
 app.post('/admin/wipe', requireAdmin, async (req, res) => {
@@ -2863,6 +2885,11 @@ const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+// generic error handler
+app.use((err, req, res, next) => {
+  try { console.error('ERR', (err && err.message) || err) } catch {}
+  res.status(500).json({ message: 'Internal error' })
+})
 function requireAuth(req, res, next) {
   const hdr = req.headers.authorization || '';
   const m = hdr.match(/^Bearer\s+(.+)$/i);
@@ -2979,16 +3006,18 @@ app.post('/auth/login', rateLimit(60_000, 5, 'login'), (req, res) => {
   const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').toString();
   const ua = String(req.headers['user-agent'] || '');
   if (!username || !password) return res.status(400).json({ message: 'Missing username/password' });
+  if (isLockedUser(username)) return res.status(429).json({ message: 'Account temporarily locked' })
   if (MONGO_READY) {
     return mongoDb.collection('users').findOne({ username }).then(row => {
       if (!row) return res.status(401).json({ message: 'Invalid credentials' });
       const ok = bcrypt.compareSync(password, row.password_hash || '');
-      if (!ok) return res.status(401).json({ message: 'Invalid credentials' });
+      if (!ok) { onLoginFail(username); mongoDb.collection('security_logs').insertOne({ ts: new Date().toISOString(), username, success: 0, ip, ua, city: '', note: 'login_fail' }).catch(()=>{}); return res.status(401).json({ message: 'Invalid credentials' }); }
       const roles = Array.isArray(row.role) ? row.role : String(row.role || 'user').split(',').map(s=>s.trim()).filter(Boolean);
       if (roles.includes('user_disabled') || roles.includes('disabled')) return res.status(403).json({ message: 'Account disabled' })
       const sid = crypto.randomBytes(16).toString('hex');
       mongoDb.collection('users').updateOne({ id: row.id }, { $set: { session_id: sid } }).catch(()=>{})
-      const token = jwt.sign({ uid: row.id, username: row.username, roles, sid }, JWT_SECRET, { expiresIn: '7d' });
+      const token = jwt.sign({ uid: row.id, username: row.username, roles, sid }, JWT_SECRET, { expiresIn: '1d' });
+      onLoginSuccess(username)
       res.json({ token, roles });
       mongoDb.collection('security_logs').insertOne({ ts: new Date().toISOString(), username, success: 1, ip, ua, city: '', note: 'login' }).catch(()=>{})
     }).catch(err => res.status(500).json({ message: 'DB error', detail: err.message }));
@@ -2998,26 +3027,28 @@ app.post('/auth/login', rateLimit(60_000, 5, 'login'), (req, res) => {
     if (err) return res.status(500).json({ message: 'DB error', detail: err.message });
     if (!row) return res.status(401).json({ message: 'Invalid credentials' });
     const ok = bcrypt.compareSync(password, row.password_hash || '');
-    if (!ok) return res.status(401).json({ message: 'Invalid credentials' });
+    if (!ok) { onLoginFail(username); db.run(`INSERT INTO security_logs (ts, username, success, ip, ua, city, note) VALUES (?,?,?,?,?,?,?)`, [new Date().toISOString(), username, 0, ip, ua, '', 'login_fail'], () => {}); return res.status(401).json({ message: 'Invalid credentials' }); }
     const roles = String(row.role || 'user').split(',').map(s=>s.trim()).filter(Boolean);
     if (roles.includes('user_disabled') || roles.includes('disabled')) return res.status(403).json({ message: 'Account disabled' })
     const sid = crypto.randomBytes(16).toString('hex');
     db.run(`UPDATE users SET session_id = ? WHERE id = ?`, [sid, row.id], () => {});
-    const token = jwt.sign({ uid: row.id, username: row.username, roles, sid }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ uid: row.id, username: row.username, roles, sid }, JWT_SECRET, { expiresIn: '1d' });
+    onLoginSuccess(username)
     res.json({ token, roles });
     db.run(`INSERT INTO security_logs (ts, username, success, ip, ua, city, note) VALUES (?,?,?,?,?,?,?)`, [new Date().toISOString(), username, 1, ip, ua, '', 'login'], () => {})
   });
 });
 
-app.post('/auth/change-password', requireAuth, (req, res) => {
+app.post('/auth/change-password', rateLimit(60_000, 5, 'change_pwd'), requireAuth, (req, res) => {
   const { old_password, new_password } = req.body;
   if (!old_password || !new_password) return res.status(400).json({ message: 'Missing old/new password' });
+  if (String(new_password).length < 8) return res.status(400).json({ message: 'Weak password' })
   if (MONGO_READY) {
     return mongoDb.collection('users').findOne({ id: Number(req.user.uid) }).then(row => {
       if (!row) return res.status(404).json({ message: 'User not found' });
       const ok = bcrypt.compareSync(old_password, row.password_hash || '');
       if (!ok) return res.status(401).json({ message: 'Invalid old password' });
-      const hash = bcrypt.hashSync(String(new_password), 10);
+      const hash = bcrypt.hashSync(String(new_password), 12);
       mongoDb.collection('users').updateOne({ id: Number(req.user.uid) }, { $set: { password_hash: hash } }).then(() => res.json({ changed: 1 })).catch(e => res.status(500).json({ message: 'DB error', detail: e.message }));
     }).catch(err => res.status(500).json({ message: 'DB error', detail: err.message }));
   }
@@ -3027,7 +3058,7 @@ app.post('/auth/change-password', requireAuth, (req, res) => {
     if (!row) return res.status(404).json({ message: 'User not found' });
     const ok = bcrypt.compareSync(old_password, row.password_hash || '');
     if (!ok) return res.status(401).json({ message: 'Invalid old password' });
-    const hash = bcrypt.hashSync(String(new_password), 10);
+    const hash = bcrypt.hashSync(String(new_password), 12);
     db.run(`UPDATE users SET password_hash = ? WHERE id = ?`, [hash, req.user.uid], function(e){
       if (e) return res.status(500).json({ message: 'DB error', detail: e.message });
       res.json({ changed: this.changes });
@@ -3055,10 +3086,11 @@ app.get('/users', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/users', requireAdmin, (req, res) => {
+app.post('/users', rateLimit(60_000, 10, 'admin'), requireAdmin, (req, res) => {
   const { username, password, role = 'user' } = req.body;
   if (!username || !password) return res.status(400).json({ message: 'Missing username/password' });
-  const hash = bcrypt.hashSync(String(password), 10);
+  if (String(password).length < 8) return res.status(400).json({ message: 'Weak password' });
+  const hash = bcrypt.hashSync(String(password), 12);
   if (MONGO_READY) {
     return mongoDb.collection('users').findOne({ username }).then(exists => {
       if (exists) return res.status(409).json({ message: 'Username already exists' });
@@ -3168,11 +3200,12 @@ app.delete('/users/:id', requireAdmin, (req, res) => {
   return res.status(500).json({ message: 'DB error', detail: 'No storage backend ready' });
 });
 
-app.put('/users/:id/password', requireAdmin, (req, res) => {
+app.put('/users/:id/password', rateLimit(60_000, 10, 'admin'), requireAdmin, (req, res) => {
   const id = req.params.id;
   const { new_password } = req.body;
   if (!new_password) return res.status(400).json({ message: 'Missing new_password' });
-  const hash = bcrypt.hashSync(String(new_password), 10);
+  if (String(new_password).length < 8) return res.status(400).json({ message: 'Weak password' });
+  const hash = bcrypt.hashSync(String(new_password), 12);
   if (MONGO_READY) {
     return mongoDb.collection('users').updateOne({ id: Number(id) }, { $set: { password_hash: hash } }, { upsert: true }).then(() => res.json({ changed: 1 })).catch(e => res.status(500).json({ message: 'DB error', detail: e.message }));
   }
@@ -3201,6 +3234,35 @@ app.post('/admin/fix-owners', requireAdmin, async (req, res) => {
   } catch (e) {
     res.status(500).json({ message: 'Fix owners failed', detail: e.message })
   }
+})
+
+app.post('/auth/forgot', async (req, res) => {
+  const { username, email } = req.body || {}
+  if (!username || !email) return res.status(400).json({ message: 'Missing username/email' })
+  const tmp = crypto.randomBytes(4).toString('hex')
+  const hash = bcrypt.hashSync(String(tmp), 10)
+  if (MONGO_READY) {
+    try {
+      const u = await mongoDb.collection('users').findOne({ username })
+      if (!u) return res.status(404).json({ message: 'User not found' })
+      await mongoDb.collection('users').updateOne({ username }, { $set: { password_hash: hash } })
+    } catch (e) { return res.status(500).json({ message: 'DB error' }) }
+  } else if (SQLITE_READY) {
+    const u = await new Promise((resolve) => { db.get(`SELECT id, username FROM users WHERE username = ?`, [username], (err, row) => resolve(row || null)) })
+    if (!u) return res.status(404).json({ message: 'User not found' })
+    const ok = await new Promise((resolve) => { db.run(`UPDATE users SET password_hash = ? WHERE username = ?`, [hash, username], function(err){ resolve(!err) }) })
+    if (!ok) return res.status(500).json({ message: 'DB error' })
+  } else {
+    return res.status(500).json({ message: 'No database' })
+  }
+  let sent = 0
+  if (mailer && SMTP_FROM) {
+    try {
+      await mailer.sendMail({ from: SMTP_FROM, to: email, subject: 'Mật khẩu mới - Quản lý Chè', text: `Mật khẩu mới của bạn: ${tmp}` })
+      sent = 1
+    } catch {}
+  }
+  res.json({ changed: 1, sent })
 })
 app.post('/admin/assign-owner', requireAdmin, (req, res) => {
   const { type, id, owner } = req.body || {};
@@ -3386,11 +3448,12 @@ app.post('/admin/users/delete', requireAdmin, (req, res) => {
   }
   return res.status(500).json({ message: 'DB error', detail: 'No storage backend ready' })
 })
-app.put('/users/:id/password', requireAdmin, (req, res) => {
+app.put('/users/:id/password', rateLimit(60_000, 10, 'admin'), requireAdmin, (req, res) => {
   const id = Number(req.params.id)
   const { new_password } = req.body || {}
   if (!new_password) return res.status(400).json({ message: 'Missing new_password' })
-  const hash = bcrypt.hashSync(String(new_password), 10)
+  if (String(new_password).length < 8) return res.status(400).json({ message: 'Weak password' })
+  const hash = bcrypt.hashSync(String(new_password), 12)
   if (SQLITE_READY) {
     return db.run(`UPDATE users SET password_hash = ? WHERE id = ?`, [hash, id], function (err) {
       if (err) return res.status(500).json({ message: 'DB error', detail: err.message })
@@ -3532,3 +3595,28 @@ async function compareMonths(s){
   ]
   return { reply, actions }
 }
+const SMTP_HOST = process.env.SMTP_HOST || ''
+const SMTP_PORT = Number(process.env.SMTP_PORT || 0)
+const SMTP_USER = process.env.SMTP_USER || ''
+const SMTP_PASS = process.env.SMTP_PASS || ''
+const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER || ''
+let mailer = null
+if (SMTP_HOST && SMTP_PORT && SMTP_USER && SMTP_PASS) {
+  try { mailer = nodemailer.createTransport({ host: SMTP_HOST, port: SMTP_PORT, secure: SMTP_PORT === 465, auth: { user: SMTP_USER, pass: SMTP_PASS } }) } catch {}
+}
+const LOGIN_FAIL = new Map() // username -> { cnt, until }
+function isLockedUser(username){
+  const it = LOGIN_FAIL.get(String(username)||'')
+  if (!it) return false
+  const now = Date.now()
+  return it.until && it.until > now
+}
+function onLoginFail(username){
+  const u = String(username||'')
+  const now = Date.now()
+  const it = LOGIN_FAIL.get(u) || { cnt:0, until:0 }
+  it.cnt += 1
+  if (it.cnt >= 7) { it.until = now + 15*60*1000; it.cnt = 0 }
+  LOGIN_FAIL.set(u, it)
+}
+function onLoginSuccess(username){ LOGIN_FAIL.delete(String(username||'')) }
