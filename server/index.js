@@ -19,10 +19,13 @@ app.use(helmet({ contentSecurityPolicy: false, hsts: false }))
 app.disable('x-powered-by')
 const BACKUPS_DIR = process.env.BACKUPS_DIR || path.join(__dirname, 'backups');
 const ALLOWED_ORIGIN = process.env.CORS_ORIGIN || ''
+const ALLOW_DEV_ORIGIN = String(process.env.ALLOW_DEV_ORIGIN||'').toLowerCase()==='true'
 app.use((req, res, next) => {
   const origin = String(req.headers.origin || '')
   if (ALLOWED_ORIGIN && origin === ALLOWED_ORIGIN) {
     res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN)
+  } else if (ALLOW_DEV_ORIGIN && DEV_ORIGIN_OK.test(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
   }
   res.setHeader('Access-Control-Allow-Credentials', 'true')
   res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
