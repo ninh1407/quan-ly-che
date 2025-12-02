@@ -7,7 +7,6 @@ const { MongoClient } = require('mongodb');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
 
 const app = express();
 const helmet = require('helmet');
@@ -3272,34 +3271,6 @@ app.post('/admin/fix-owners', requireAdmin, async (req, res) => {
   }
 })
 
-app.post('/auth/forgot', async (req, res) => {
-  const { username, email } = req.body || {}
-  if (!username || !email) return res.status(400).json({ message: 'Missing username/email' })
-  const tmp = crypto.randomBytes(4).toString('hex')
-  const hash = bcrypt.hashSync(String(tmp), 10)
-  if (MONGO_READY) {
-    try {
-      const u = await mongoDb.collection('users').findOne({ username })
-      if (!u) return res.status(404).json({ message: 'User not found' })
-      await mongoDb.collection('users').updateOne({ username }, { $set: { password_hash: hash } })
-    } catch (e) { return res.status(500).json({ message: 'DB error' }) }
-  } else if (SQLITE_READY) {
-    const u = await new Promise((resolve) => { db.get(`SELECT id, username FROM users WHERE username = ?`, [username], (err, row) => resolve(row || null)) })
-    if (!u) return res.status(404).json({ message: 'User not found' })
-    const ok = await new Promise((resolve) => { db.run(`UPDATE users SET password_hash = ? WHERE username = ?`, [hash, username], function(err){ resolve(!err) }) })
-    if (!ok) return res.status(500).json({ message: 'DB error' })
-  } else {
-    return res.status(500).json({ message: 'No database' })
-  }
-  let sent = 0
-  if (mailer && SMTP_FROM) {
-    try {
-      await mailer.sendMail({ from: SMTP_FROM, to: email, subject: 'Mật khẩu mới - Quản lý Chè', text: `Mật khẩu mới của bạn: ${tmp}` })
-      sent = 1
-    } catch {}
-  }
-  res.json({ changed: 1, sent })
-})
 app.post('/admin/assign-owner', requireAdmin, (req, res) => {
   const { type, id, owner } = req.body || {};
   if (!['sales','purchases','expenses'].includes(String(type))) return res.status(400).json({ message: 'Invalid type' });
@@ -3630,15 +3601,6 @@ async function compareMonths(s){
     { type:'navigate', tab:'expenses', label:`Mở Chi phí tháng ${m1}` }
   ]
   return { reply, actions }
-}
-const SMTP_HOST = process.env.SMTP_HOST || ''
-const SMTP_PORT = Number(process.env.SMTP_PORT || 0)
-const SMTP_USER = process.env.SMTP_USER || ''
-const SMTP_PASS = process.env.SMTP_PASS || ''
-const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER || ''
-let mailer = null
-if (SMTP_HOST && SMTP_PORT && SMTP_USER && SMTP_PASS) {
-  try { mailer = nodemailer.createTransport({ host: SMTP_HOST, port: SMTP_PORT, secure: SMTP_PORT === 465, auth: { user: SMTP_USER, pass: SMTP_PASS } }) } catch {}
 }
 const LOGIN_FAIL = new Map() // username -> { cnt, until }
 function isLockedUser(username){
