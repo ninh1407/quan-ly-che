@@ -5,7 +5,8 @@ let baseURL = envBase || null;
 if (!baseURL) {
   if (typeof window !== 'undefined') {
     const host = window.location.hostname || 'localhost';
-    baseURL = `${window.location.protocol}//${host}:4000`;
+    const isDevHost = /^(localhost|127\.0\.0\.1|192\.168\.)/.test(host);
+    baseURL = isDevHost ? `${window.location.protocol}//${host}:4000` : '/api';
   } else {
     baseURL = 'http://localhost:4000';
   }
