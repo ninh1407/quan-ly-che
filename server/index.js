@@ -7,8 +7,6 @@ const { MongoClient } = require('mongodb');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { authenticator } = require('otplib');
-const qrcode = require('qrcode');
 
 const app = express();
 const helmet = require('helmet');
@@ -89,15 +87,7 @@ if (SQLITE_READY) {
   try {
     // Indexes will be created after tables are ensured below
   } catch {}
-  try {
-    db.all(`PRAGMA table_info(users)`, [], (e, cols) => {
-      if (e || !Array.isArray(cols)) return
-      const names = cols.map(c => c.name)
-      if (!names.includes('twofa_secret')) { try { db.run(`ALTER TABLE users ADD COLUMN twofa_secret TEXT`) } catch {} }
-      if (!names.includes('twofa_enabled')) { try { db.run(`ALTER TABLE users ADD COLUMN twofa_enabled INTEGER DEFAULT 0`) } catch {} }
-      if (!names.includes('session_id')) { try { db.run(`ALTER TABLE users ADD COLUMN session_id TEXT`) } catch {} }
-    })
-  } catch {}
+  // users table columns are ensured elsewhere; no 2FA columns required
 }
 
 function ensureBackupDir() {
@@ -3053,12 +3043,8 @@ app.post('/auth/login', rateLimit(60_000, 5, 'login'), (req, res) => {
       if (!row) return res.status(401).json({ message: 'Invalid credentials' });
       const ok = bcrypt.compareSync(password, row.password_hash || '');
       if (!ok) { onLoginFail(username); mongoDb.collection('security_logs').insertOne({ ts: new Date().toISOString(), username, success: 0, ip, ua, city: '', note: 'login_fail' }).catch(()=>{}); return res.status(401).json({ message: 'Invalid credentials' }); }
-      const otp = b.otp ?? q.otp
-      if (String(row.twofa_enabled||0) === '1') {
-        if (!otp || !authenticator.verify({ token: String(otp), secret: String(row.twofa_secret||'') })) {
-          return res.status(401).json({ message:'OTP required', otp_required:true })
-        }
-      }
+      // 2FA if enabled
+      // 2FA disabled
       const roles = Array.isArray(row.role) ? row.role : String(row.role || 'user').split(',').map(s=>s.trim()).filter(Boolean);
       if (roles.includes('user_disabled') || roles.includes('disabled')) return res.status(403).json({ message: 'Account disabled' })
       const sid = crypto.randomBytes(16).toString('hex');
@@ -3075,24 +3061,16 @@ app.post('/auth/login', rateLimit(60_000, 5, 'login'), (req, res) => {
     if (!row) return res.status(401).json({ message: 'Invalid credentials' });
     const ok = bcrypt.compareSync(password, row.password_hash || '');
     if (!ok) { onLoginFail(username); db.run(`INSERT INTO security_logs (ts, username, success, ip, ua, city, note) VALUES (?,?,?,?,?,?,?)`, [new Date().toISOString(), username, 0, ip, ua, '', 'login_fail'], () => {}); return res.status(401).json({ message: 'Invalid credentials' }); }
-    const otp = b.otp ?? q.otp
-    db.get(`SELECT twofa_enabled, twofa_secret FROM users WHERE id = ?`, [row.id], (e2, r2) => {
-      const enabled = Number((r2 && r2.twofa_enabled) || 0) === 1
-      const secret = String((r2 && r2.twofa_secret) || '')
-      if (enabled) {
-        if (!otp || !authenticator.verify({ token:String(otp), secret }) ) {
-          return res.status(401).json({ message:'OTP required', otp_required:true })
-        }
-      }
-      const roles = String(row.role || 'user').split(',').map(s=>s.trim()).filter(Boolean);
-      if (roles.includes('user_disabled') || roles.includes('disabled')) return res.status(403).json({ message: 'Account disabled' })
-      const sid = crypto.randomBytes(16).toString('hex');
-      db.run(`UPDATE users SET session_id = ? WHERE id = ?`, [sid, row.id], () => {});
-      const token = jwt.sign({ uid: row.id, username: row.username, roles, sid }, JWT_SECRET, { expiresIn: '12h' });
-      onLoginSuccess(username)
-      res.json({ token, roles });
-      db.run(`INSERT INTO security_logs (ts, username, success, ip, ua, city, note) VALUES (?,?,?,?,?,?,?)`, [new Date().toISOString(), username, 1, ip, ua, '', 'login'], () => {})
-    })
+    // 2FA if enabled
+    // 2FA disabled
+    const roles = String(row.role || 'user').split(',').map(s=>s.trim()).filter(Boolean);
+    if (roles.includes('user_disabled') || roles.includes('disabled')) return res.status(403).json({ message: 'Account disabled' })
+    const sid = crypto.randomBytes(16).toString('hex');
+    db.run(`UPDATE users SET session_id = ? WHERE id = ?`, [sid, row.id], () => {});
+    const token = jwt.sign({ uid: row.id, username: row.username, roles, sid }, JWT_SECRET, { expiresIn: '12h' });
+    onLoginSuccess(username)
+    res.json({ token, roles });
+    db.run(`INSERT INTO security_logs (ts, username, success, ip, ua, city, note) VALUES (?,?,?,?,?,?,?)`, [new Date().toISOString(), username, 1, ip, ua, '', 'login'], () => {})
   });
 });
 
@@ -3122,43 +3100,6 @@ app.post('/auth/change-password', rateLimit(60_000, 5, 'change_pwd'), requireAut
     });
   });
 });
-
-app.post('/auth/2fa/setup', rateLimit(60_000, 5, 'admin'), requireAdmin, async (req, res) => {
-  try {
-    const user = String(req.user?.username||'')
-    const secret = authenticator.generateSecret()
-    const otpauth = authenticator.keyuri(user, 'QuanLyChe', secret)
-    let qr = ''
-    try { qr = await qrcode.toDataURL(otpauth) } catch {}
-    res.json({ secret, otpauth, qr })
-  } catch (e) { res.status(500).json({ message:'Setup error' }) }
-})
-
-app.post('/auth/2fa/enable', rateLimit(60_000, 5, 'admin'), requireAdmin, async (req, res) => {
-  const { otp, secret } = req.body || {}
-  if (!otp || !secret) return res.status(400).json({ message:'Missing otp/secret' })
-  const ok = authenticator.verify({ token:String(otp), secret:String(secret) })
-  if (!ok) return res.status(401).json({ message:'Invalid OTP' })
-  if (MONGO_READY) {
-    try { await mongoDb.collection('users').updateOne({ id:Number(req.user.uid) }, { $set: { twofa_secret:String(secret), twofa_enabled:1 } }); return res.json({ enabled:1 }) } catch { return res.status(500).json({ message:'DB error' }) }
-  }
-  if (!SQLITE_READY) return res.status(500).json({ message:'SQLite disabled' })
-  db.run(`UPDATE users SET twofa_secret = ?, twofa_enabled = 1 WHERE id = ?`, [String(secret), Number(req.user.uid)], function(err){ if (err) return res.status(500).json({ message:'DB error' }); res.json({ enabled:this.changes }) })
-})
-
-app.post('/auth/2fa/disable', rateLimit(60_000, 5, 'admin'), requireAdmin, async (req, res) => {
-  const { otp } = req.body || {}
-  if (MONGO_READY) {
-    try { const u = await mongoDb.collection('users').findOne({ id:Number(req.user.uid) }); const sec = String(u?.twofa_secret||''); if (sec && (!otp || !authenticator.verify({ token:String(otp), secret:sec }))) return res.status(401).json({ message:'Invalid OTP' }); await mongoDb.collection('users').updateOne({ id:Number(req.user.uid) }, { $set: { twofa_secret:'', twofa_enabled:0 } }); return res.json({ disabled:1 }) } catch { return res.status(500).json({ message:'DB error' }) }
-  }
-  if (!SQLITE_READY) return res.status(500).json({ message:'SQLite disabled' })
-  db.get(`SELECT twofa_secret FROM users WHERE id = ?`, [Number(req.user.uid)], (e,row)=>{
-    if (e) return res.status(500).json({ message:'DB error' })
-    const sec = String(row?.twofa_secret||'')
-    if (sec && (!otp || !authenticator.verify({ token:String(otp), secret:sec }))) return res.status(401).json({ message:'Invalid OTP' })
-    db.run(`UPDATE users SET twofa_secret = '', twofa_enabled = 0 WHERE id = ?`, [Number(req.user.uid)], function(err){ if (err) return res.status(500).json({ message:'DB error' }); res.json({ disabled:this.changes }) })
-  })
-})
 
 // Users & Roles management (admin only)
 app.get('/users', requireAdmin, (req, res) => {
