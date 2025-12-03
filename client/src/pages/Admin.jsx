@@ -257,7 +257,7 @@ export default function Admin() {
             <option value="purchases">Đơn nhập</option>
             <option value="expenses">Chi phí</option>
           </select>
-          <button className="btn" onClick={downloadTemplate}>Tải mẫu CSV</button>
+          <button className="btn" onClick={downloadTemplate}>Tải mẫu CSV (tiêu đề tiếng Việt)</button>
           <input type="file" accept=".csv,text/csv" onChange={handleImportFile} />
           <button className="btn primary" onClick={submitImport}>Import</button>
         </div>
@@ -268,7 +268,7 @@ export default function Admin() {
             <tbody>{impRows.slice(0,10).map((r,i)=> <tr key={i}>{Object.values(r).map((v,j)=> <td key={j}>{String(v||'')}</td>)}</tr>)}</tbody>
           </table>
         </div>}
-        <div className="muted" style={{ marginTop:8 }}>Excel → Save As → CSV (Comma). Bắt buộc: Đơn bán: sale_date, customer_name, tea_type, price_per_kg, weight. Đơn nhập: purchase_date, supplier_name, weight, unit_price. Chi phí: expense_date, description, amount.</div>
+        <div className="muted" style={{ marginTop:8 }}>Excel → Lưu dạng CSV (Comma). Bắt buộc: Đơn bán: Ngày bán, Tên người mua, Loại chè, Giá/kg, Khối lượng. Đơn nhập: Ngày nhập, Tên nhà cung cấp, Khối lượng, Đơn giá. Chi phí: Ngày chi phí, Mô tả, Số tiền, Nhóm.</div>
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>

@@ -1929,13 +1929,13 @@ app.get('/admin/audit-logs', requireAdmin, (req, res) => {
 app.get('/admin/import/template', requireAdmin, (req, res) => {
   const type = String((req.query&&req.query.type)||'').toLowerCase()
   let headers = []
-  if (type==='sales') headers = ['sale_date','customer_name','tea_type','price_per_kg','weight','payment_status','ticket_name','invoice_no','contract','issued_by','export_type','country']
-  else if (type==='purchases') headers = ['purchase_date','supplier_name','weight','unit_price','payment_status','water_percent','net_weight','ticket_name','invoice_no','weigh_ticket_code','vehicle_plate']
-  else if (type==='expenses') headers = ['expense_date','description','amount','category']
+  if (type==='sales') headers = ['Ngày bán','Tên người mua','Loại chè','Giá/kg','Khối lượng','Trạng thái','Tên phiếu','Số hóa đơn','Hợp đồng','Người xuất','Loại xuất','Quốc gia']
+  else if (type==='purchases') headers = ['Ngày nhập','Tên nhà cung cấp','Khối lượng','Đơn giá','Trạng thái','% nước','Khối lượng tịnh','Tên phiếu','Số hóa đơn','Mã phiếu cân','Biển số xe']
+  else if (type==='expenses') headers = ['Ngày chi phí','Mô tả','Số tiền','Nhóm']
   else return res.status(400).json({ message:'Unknown type', detail:'type must be sales|purchases|expenses' })
   const csv = '\uFEFF'+headers.join(',')+'\n'
   res.setHeader('Content-Type','text/csv; charset=utf-8')
-  res.setHeader('Content-Disposition',`attachment; filename="template_${type}.csv"`)
+  res.setHeader('Content-Disposition',`attachment; filename="mau_${type}.csv"`)
   res.send(csv)
 })
 
@@ -1945,6 +1945,21 @@ app.post('/admin/import', requireAdmin, (req, res) => {
   if (!rows.length) return res.status(400).json({ message:'No rows' })
   if (!SQLITE_READY) return res.status(500).json({ message:'DB error', detail:'SQLite disabled' })
   const results = { inserted: 0, failed: 0, errors: [] }
+  const MAP_SALES = {
+    'Ngày bán':'sale_date','Tên người mua':'customer_name','Loại chè':'tea_type','Giá/kg':'price_per_kg','Khối lượng':'weight','Trạng thái':'payment_status','Tên phiếu':'ticket_name','Số hóa đơn':'invoice_no','Hợp đồng':'contract','Người xuất':'issued_by','Loại xuất':'export_type','Quốc gia':'country'
+  }
+  const MAP_PURCHASES = {
+    'Ngày nhập':'purchase_date','Tên nhà cung cấp':'supplier_name','Khối lượng':'weight','Đơn giá':'unit_price','Trạng thái':'payment_status','% nước':'water_percent','Khối lượng tịnh':'net_weight','Tên phiếu':'ticket_name','Số hóa đơn':'invoice_no','Mã phiếu cân':'weigh_ticket_code','Biển số xe':'vehicle_plate'
+  }
+  const MAP_EXPENSES = {
+    'Ngày chi phí':'expense_date','Mô tả':'description','Số tiền':'amount','Nhóm':'category'
+  }
+  const normalizeKeys = (t, obj) => {
+    const out = {}
+    const map = t==='sales' ? MAP_SALES : (t==='purchases' ? MAP_PURCHASES : MAP_EXPENSES)
+    Object.keys(obj||{}).forEach(k => { const eng = map[k] || k; out[eng] = obj[k] })
+    return out
+  }
   const normalizeNum = (v) => { const s=String(v||'').toLowerCase(); const mult=/k|nghìn|ngàn/.test(s)?1000:/tr|triệu|m/.test(s)?1_000_000:1; const dig=s.replace(/[^\d]/g,''); return dig?Number(dig)*mult:0 }
   const insertDynamic = (table, obj) => new Promise((resolve) => {
     db.all(`PRAGMA table_info(${table})`, [], (e, cols) => {
@@ -1966,9 +1981,9 @@ app.post('/admin/import', requireAdmin, (req, res) => {
   const go = async () => {
     for (const r of rows) {
       try {
-        if (type==='sales') await insertDynamic('sales', r)
-        else if (type==='purchases') await insertDynamic('purchases', r)
-        else if (type==='expenses') await insertDynamic('expenses', r)
+        if (type==='sales') await insertDynamic('sales', normalizeKeys('sales', r))
+        else if (type==='purchases') await insertDynamic('purchases', normalizeKeys('purchases', r))
+        else if (type==='expenses') await insertDynamic('expenses', normalizeKeys('expenses', r))
         else { results.failed++; results.errors.push('Unknown type') }
       } catch (e) { results.failed++; results.errors.push(String(e.message||'error')) }
     }
