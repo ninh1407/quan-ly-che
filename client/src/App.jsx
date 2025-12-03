@@ -22,7 +22,6 @@ import Admin from './pages/Admin.jsx'
 import ChangePassword from './pages/ChangePassword.jsx'
 import Receipts from './pages/Receipts.jsx'
 import BottomNav from './components/BottomNav.jsx'
-import NavMenu from './components/NavMenu.jsx'
 
 export default function App() {
   const [tab, setTab] = useState('dashboard')
@@ -50,29 +49,6 @@ export default function App() {
         ...(hasRole('finance') ? ['dashboard','balanceSheet','expenses','debts','receipts'] : []),
         'customers','suppliers','changePwd'
       ]))
-  const navItems = (hasRole('admin'))
-    ? [
-        { key:'dashboard', label:'Tổng quan' },
-        { key:'balanceSheet', label:'Bảng cân đối' },
-        { key:'finishedStock', label:'Thành phẩm' },
-        { key:'sales', label:'Bán' },
-        { key:'purchases', label:'Nhập' },
-        { key:'expenses', label:'Chi phí' },
-        { key:'debts', label:'Công nợ' },
-        { key:'suppliers', label:'Nhà CC' },
-        { key:'customers', label:'Người mua' },
-        { key:'receipts', label:'Ảnh hóa đơn' },
-        { key:'stats', label:'Thống kê' },
-        { key:'tradeStats', label:'Giao dịch' },
-        { key:'changePwd', label:'Đổi mật khẩu' },
-        { key:'admin', label:'Quản trị' }
-      ]
-    : [
-        { key:'sales', label:'Bán' },
-        { key:'purchases', label:'Nhập' },
-        { key:'expenses', label:'Chi phí' },
-        { key:'changePwd', label:'Đổi mật khẩu' }
-      ]
   const go = (k) => { if (allowedTabs.includes(k)) { setTab(k); try { localStorage.setItem('current_tab', k) } catch {} } else toast('Không có quyền truy cập') }
   useEffect(() => { if (!allowedTabs.includes(tab)) setTab(allowedTabs[0]) }, [])
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('theme', theme) }, [theme])
@@ -178,7 +154,36 @@ export default function App() {
       <div className="container">
       <Header theme={theme} onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : (theme==='dark' ? 'tea' : (theme==='tea' ? 'wood' : 'light')))} onOpenMenu={() => setMenuOpen(true)} onOpenAccount={() => setAccountOpen(true)} onOpenNotif={() => setNotifOpen(true)} onOpenSettings={() => setSettingsOpen(true)} onInstallApp={installApp} installEvt={installEvt} isIOS={isIOS} onOpenIosGuide={() => setIosGuideOpen(true)} onOpenChangePwd={() => setTab('changePwd')} onLogout={() => { try { localStorage.removeItem('token'); localStorage.removeItem('role'); localStorage.removeItem('roles'); localStorage.removeItem('username'); localStorage.removeItem('current_tab'); } catch {} setAuthed(false) }} />
       <Breadcrumb tab={tab} />
-      <NavMenu items={navItems.filter(i => allowedTabs.includes(i.key))} active={tab} onSelect={(k) => go(k)} />
+      <div className="compact-tabs">
+        {(
+          (hasRole('admin'))
+            ? [
+                { key:'dashboard', label:'Tổng quan' },
+                { key:'balanceSheet', label:'Bảng cân đối' },
+                { key:'finishedStock', label:'Thành phẩm' },
+                { key:'sales', label:'Bán' },
+                { key:'purchases', label:'Nhập' },
+                { key:'expenses', label:'Chi phí' },
+                { key:'debts', label:'Công nợ' },
+                { key:'suppliers', label:'Nhà CC' },
+                { key:'customers', label:'Người mua' },
+                { key:'receipts', label:'Ảnh hóa đơn' },
+                { key:'stats', label:'Thống kê' },
+                { key:'tradeStats', label:'Giao dịch' },
+                { key:'changePwd', label:'Đổi mật khẩu' },
+                { key:'admin', label:'Quản trị' }
+              ]
+            : [
+                { key:'dashboard', label:'Tổng quan' },
+                { key:'sales', label:'Bán' },
+                { key:'purchases', label:'Nhập' },
+                { key:'expenses', label:'Chi phí' },
+                { key:'changePwd', label:'Đổi mật khẩu' }
+              ]
+        ).filter(item => allowedTabs.includes(item.key)).map(item => (
+          <button key={item.key} className={`tab ${tab===item.key?'active':''}`} onClick={() => go(item.key)}>{item.label}</button>
+        ))}
+      </div>
       {menuOpen && (
         <div className="drawer open" onClick={() => setMenuOpen(false)}>
           <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
