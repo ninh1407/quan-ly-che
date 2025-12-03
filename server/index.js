@@ -88,6 +88,18 @@ if (SQLITE_READY) {
     // Indexes will be created after tables are ensured below
   } catch {}
   // users table columns are ensured elsewhere; no 2FA columns required
+  function ensureColumn(table, name, type) {
+    try {
+      db.all(`PRAGMA table_info(${table})`, [], (e, cols) => {
+        if (e) return;
+        const names = Array.isArray(cols) ? cols.map(c => c.name) : [];
+        if (!names.includes(name)) { try { db.run(`ALTER TABLE ${table} ADD COLUMN ${name} ${type}`) } catch {} }
+      });
+    } catch {}
+  }
+  ensureColumn('sales','invoice_no','TEXT');
+  ensureColumn('purchases','invoice_no','TEXT');
+  ensureColumn('expenses','invoice_no','TEXT');
 }
 
 function ensureBackupDir() {
