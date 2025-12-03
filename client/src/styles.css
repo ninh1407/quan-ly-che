@@ -410,5 +410,5 @@ html{scroll-behavior:smooth; background: var(--bg)}
   .table th,.table td{padding:8px}
   .chart-card{height:200px}
 }
-.menu-bar{position:fixed;top:96px;left:0;right:0;background:#FFFFFF;border-bottom:1px solid #E5E7EB;padding:8px 16px;z-index:10000;display:none}
-[data-device="mobile"] .compact-tabs{display:none}
+.menu-bar{position:fixed;top:96px;left:0;right:0;background:#FFFFFF;border-bottom:1px solid #E5E7EB;padding:8px 16px;z-index:10000}
+[data-device="mobile"] .menu-bar{display:none}
