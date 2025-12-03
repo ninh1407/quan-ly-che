@@ -166,7 +166,7 @@ export default function Expenses() {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `chi_phi_${year}-${String(month).padStart(2,'0')}.csv`; a.click();
+    a.href = url; a.download = `expenses_${year}-${String(month).padStart(2,'0')}.csv`; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -175,7 +175,7 @@ export default function Expenses() {
     const rowsHtml = list.map(r => `<tr><td>${r.expense_date}</td><td>${r.description||''}</td><td>${r.category||''}</td><td style="text-align:right">${fmtMoney(r.amount)}</td></tr>`).join('');
     const totalSum = list.reduce((s, r) => s + (Number(r.amount) || 0), 0);
     const totalFormatted = fmtMoney(totalSum);
-    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Báo cáo Chi phí ${year}-${String(month).padStart(2,'0')}</title><style>
+    w.document.write(`<!doctype html><html><head><title>Expenses ${year}-${String(month).padStart(2,'0')}</title><style>
       body{font-family:sans-serif}
       table{border-collapse:collapse;width:100%}
       th,td{border:1px solid #ccc;padding:6px;text-align:left}

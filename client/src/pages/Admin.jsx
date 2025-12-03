@@ -126,7 +126,7 @@ export default function Admin() {
   const downloadTemplate = async () => {
     try {
       const r = await api.get('/admin/import/template', { params: { type: impType }, responseType:'blob' })
-      const url = URL.createObjectURL(r.data); const a = document.createElement('a'); a.href=url; a.download=`mau_${impType}.csv`; a.click(); URL.revokeObjectURL(url)
+      const url = URL.createObjectURL(r.data); const a = document.createElement('a'); a.href=url; a.download=`template_${impType}.csv`; a.click(); URL.revokeObjectURL(url)
     } catch { setImpMsg('Tải template lỗi') }
   }
   const submitImport = async () => {
