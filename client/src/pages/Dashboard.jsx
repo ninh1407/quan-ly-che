@@ -238,7 +238,6 @@ export default function Dashboard() {
 
   return (
     <div className="card">
-      <FilterBar month={month} year={year} setMonth={setMonth} setYear={setYear} selectedDay={selectedDay} setSelectedDay={setSelectedDay} />
       <div className="hero with-img with-pattern" style={{ '--hero-img': `url(${heroImg})` }}>
         <div className="hero-left">
           <div className="hero-title">Hệ thống quản lý thu mua chè</div>
@@ -252,6 +251,7 @@ export default function Dashboard() {
         </div>
         <div className="bg-decor" />
       </div>
+      <FilterBar month={month} year={year} setMonth={setMonth} setYear={setYear} selectedDay={selectedDay} setSelectedDay={setSelectedDay} />
 
       {error && <div className="error" style={{ marginTop: 8 }}>{error}</div>}
 
