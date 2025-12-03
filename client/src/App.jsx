@@ -167,7 +167,7 @@ export default function App() {
   if (!authed) {
     return (
       <div className="container">
-        <Header theme={theme} onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : (theme==='dark' ? 'tea' : (theme==='tea' ? 'wood' : 'light')))} onOpenMenu={() => setMenuOpen(true)} onOpenAccount={() => setAccountOpen(true)} onOpenNotif={() => setNotifOpen(true)} />
+        <h1 className="glass">Quản lý Chè</h1>
         <Login onSuccess={() => setAuthed(true)} onLogout={() => setAuthed(false)} />
       </div>
     )
@@ -175,7 +175,7 @@ export default function App() {
 
   return (
       <div className="container">
-      <Header theme={theme} onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : (theme==='dark' ? 'tea' : (theme==='tea' ? 'wood' : 'light')))} onOpenMenu={() => setMenuOpen(true)} onOpenAccount={() => setAccountOpen(true)} onOpenNotif={() => setNotifOpen(true)} />
+      <Header theme={theme} onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : (theme==='dark' ? 'tea' : (theme==='tea' ? 'wood' : 'light')))} onOpenMenu={() => setMenuOpen(true)} onOpenAccount={() => setAccountOpen(true)} onOpenNotif={() => setNotifOpen(true)} onOpenSettings={() => setSettingsOpen(true)} onInstallApp={installApp} installEvt={installEvt} isIOS={isIOS} onOpenIosGuide={() => setIosGuideOpen(true)} onOpenChangePwd={() => setTab('changePwd')} onLogout={() => { try { localStorage.removeItem('token'); localStorage.removeItem('role'); localStorage.removeItem('roles'); localStorage.removeItem('username'); localStorage.removeItem('current_tab'); } catch {} setAuthed(false) }} />
       <Breadcrumb tab={tab} />
       <NavMenu items={navItems.filter(i => allowedTabs.includes(i.key))} active={tab} onSelect={(k) => go(k)} />
       {menuOpen && (

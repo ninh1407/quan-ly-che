@@ -6,7 +6,7 @@
 .container[data-device="pc"], [data-device="pc"] .container{padding-top:128px}
 .mobile-toolbar{display:none}
 [data-device="mobile"] .mobile-toolbar{display:flex}
-[data-device="mobile"] .container{padding-top:calc(112px + env(safe-area-inset-top, 0px))}
+[data-device="mobile"] .container{padding-top:calc(96px + env(safe-area-inset-top, 0px))}
 /* Hiển thị mobile toolbar chỉ khi data-device="mobile" để tránh flash theo width */
 .nav-buttons{display:flex;gap:10px;flex-wrap:wrap}
 .hamburger-btn{padding:10px 12px;border:1px solid var(--border);background:var(--accent);border-radius:10px}
