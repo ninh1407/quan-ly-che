@@ -17,9 +17,12 @@ import CommandPalette from './components/CommandPalette.jsx'
 import ToastContainer, { toast } from './components/Toast.jsx'
 import Login from './pages/Login.jsx'
 import Breadcrumb from './components/Breadcrumb.jsx'
+import Header from './components/Header.jsx'
 import Admin from './pages/Admin.jsx'
 import ChangePassword from './pages/ChangePassword.jsx'
 import Receipts from './pages/Receipts.jsx'
+import BottomNav from './components/BottomNav.jsx'
+import NavMenu from './components/NavMenu.jsx'
 
 export default function App() {
   const [tab, setTab] = useState('dashboard')
@@ -46,6 +49,29 @@ export default function App() {
         ...(hasRole('finance') ? ['dashboard','balanceSheet','expenses','debts','receipts'] : []),
         'customers','suppliers','changePwd'
       ]))
+  const navItems = (hasRole('admin'))
+    ? [
+        { key:'dashboard', label:'Tổng quan' },
+        { key:'balanceSheet', label:'Bảng cân đối' },
+        { key:'finishedStock', label:'Thành phẩm' },
+        { key:'sales', label:'Bán' },
+        { key:'purchases', label:'Nhập' },
+        { key:'expenses', label:'Chi phí' },
+        { key:'debts', label:'Công nợ' },
+        { key:'suppliers', label:'Nhà CC' },
+        { key:'customers', label:'Người mua' },
+        { key:'receipts', label:'Ảnh hóa đơn' },
+        { key:'stats', label:'Thống kê' },
+        { key:'tradeStats', label:'Giao dịch' },
+        { key:'changePwd', label:'Đổi mật khẩu' },
+        { key:'admin', label:'Quản trị' }
+      ]
+    : [
+        { key:'sales', label:'Bán' },
+        { key:'purchases', label:'Nhập' },
+        { key:'expenses', label:'Chi phí' },
+        { key:'changePwd', label:'Đổi mật khẩu' }
+      ]
   const go = (k) => { if (allowedTabs.includes(k)) { setTab(k); try { localStorage.setItem('current_tab', k) } catch {} } else toast('Không có quyền truy cập') }
   useEffect(() => { if (!allowedTabs.includes(tab)) setTab(allowedTabs[0]) }, [])
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('theme', theme) }, [theme])
@@ -141,7 +167,7 @@ export default function App() {
   if (!authed) {
     return (
       <div className="container">
-        <h1 className="glass">Quản lý Chè</h1>
+        <Header theme={theme} onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : (theme==='dark' ? 'tea' : (theme==='tea' ? 'wood' : 'light')))} onOpenMenu={() => setMenuOpen(true)} onOpenAccount={() => setAccountOpen(true)} onOpenNotif={() => setNotifOpen(true)} />
         <Login onSuccess={() => setAuthed(true)} onLogout={() => setAuthed(false)} />
       </div>
     )
@@ -149,36 +175,9 @@ export default function App() {
 
   return (
       <div className="container">
-      <h1 className="glass">Quản lý Chè</h1>
+      <Header theme={theme} onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : (theme==='dark' ? 'tea' : (theme==='tea' ? 'wood' : 'light')))} onOpenMenu={() => setMenuOpen(true)} onOpenAccount={() => setAccountOpen(true)} onOpenNotif={() => setNotifOpen(true)} />
       <Breadcrumb tab={tab} />
-      <div className="tabs">
-          <button className="btn" onClick={() => setMenuOpen(true)}>☰ Menu</button>
-          <button className="btn" onClick={() => setTheme(theme === 'light' ? 'dark' : (theme==='dark' ? 'tea' : (theme==='tea' ? 'wood' : 'light')))}>{theme === 'light' ? '🌙 Tối' : (theme==='dark' ? '🍵 Nâu – Xanh lá' : (theme==='tea' ? '🪵 Gỗ truyền thống' : '☀️ Sáng'))}</button>
-          {isMobile ? (
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginLeft:'auto' }}>
-              <button className="btn" onClick={() => setAccountOpen(true)}>Tài khoản</button>
-              <button className="btn" onClick={() => setNotifOpen(true)}>Thông báo</button>
-              <button className="btn" onClick={() => setSettingsOpen(true)}>Cài đặt</button>
-              {installEvt && <button className="btn" onClick={installApp}>Cài đặt App</button>}
-              {isIOS && <button className="btn" onClick={() => setIosGuideOpen(true)}>Cài trên iPhone</button>}
-              <button className="btn" onClick={() => setTab('changePwd')}>Đổi mật khẩu</button>
-              <button className="btn" onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('role'); setAuthed(false) }}>Đăng xuất</button>
-            </div>
-          ) : (
-            <details className="dropdown" style={{ marginLeft: 'auto' }}>
-              <summary className="btn avatar"><span className="circle">{(localStorage.getItem('username')||'N')[0].toUpperCase()}</span> {(localStorage.getItem('username')||'Người dùng')} ▾</summary>
-              <div className="dropdown-menu">
-                <button className="btn" onClick={() => setAccountOpen(true)}>Tài khoản</button>
-                <button className="btn" onClick={() => setNotifOpen(true)}>Thông báo</button>
-                <button className="btn" onClick={() => setSettingsOpen(true)}>Cài đặt</button>
-                {installEvt && <button className="btn" onClick={installApp}>Cài đặt App</button>}
-                {isIOS && <button className="btn" onClick={() => setIosGuideOpen(true)}>Cài trên iPhone</button>}
-                <button className="btn" onClick={() => setTab('changePwd')}>Đổi mật khẩu</button>
-                <button className="btn" onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('role'); setAuthed(false) }}>Đăng xuất</button>
-              </div>
-            </details>
-          )}
-      </div>
+      <NavMenu items={navItems.filter(i => allowedTabs.includes(i.key))} active={tab} onSelect={(k) => go(k)} />
       {menuOpen && (
         <div className="drawer open" onClick={() => setMenuOpen(false)}>
           <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
@@ -318,6 +317,9 @@ export default function App() {
         </div>
       )}
       <button className="fab-menu" onClick={() => setMenuOpen(true)} aria-label="Menu">☰</button>
+      {isMobile && (
+        <BottomNav tab={tab} onNavigate={(k) => go(k)} allowedTabs={allowedTabs} />
+      )}
     </div>
   )
 }
