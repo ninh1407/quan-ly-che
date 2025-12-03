@@ -84,9 +84,11 @@ export default function App() {
       const dev = (isMobileUA || isSmall) ? 'mobile' : 'pc'
       document.documentElement.setAttribute('data-device', dev)
       localStorage.setItem('device', dev)
+      setIsMobile(dev === 'mobile')
     } catch {
       document.documentElement.setAttribute('data-device', 'pc')
       localStorage.setItem('device', 'pc')
+      setIsMobile(false)
     }
   }, [])
   useEffect(() => {
@@ -103,9 +105,8 @@ export default function App() {
       const isiOS = /iPad|iPhone|iPod/.test(ua) || ((navigator.platform||'')==='MacIntel' && Number(navigator.maxTouchPoints||0)>1)
       const isSafari = /Safari/i.test(ua) && !/Chrome/i.test(ua)
       setIsIOS(isiOS && isSafari)
-      const isMobileUA = /Android|iPhone|iPad|iPod/i.test(ua)
-      const isSmall = (typeof window!=='undefined') ? (window.innerWidth <= 768) : false
-      setIsMobile(isMobileUA || isSmall)
+      const dev = localStorage.getItem('device') || document.documentElement.getAttribute('data-device') || 'pc'
+      setIsMobile(dev === 'mobile')
     } catch {}
   }, [])
   const installApp = async () => { try { if (installEvt) { await installEvt.prompt(); setInstallEvt(null) } } catch {} }
@@ -178,9 +179,7 @@ export default function App() {
       <div className="container">
       <Header theme={theme} onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : (theme==='dark' ? 'tea' : (theme==='tea' ? 'wood' : 'light')))} onOpenMenu={() => setMenuOpen(true)} onOpenAccount={() => setAccountOpen(true)} onOpenNotif={() => setNotifOpen(true)} onOpenSettings={() => setSettingsOpen(true)} onInstallApp={installApp} installEvt={installEvt} isIOS={isIOS} onOpenIosGuide={() => setIosGuideOpen(true)} onOpenChangePwd={() => setTab('changePwd')} onLogout={() => { try { localStorage.removeItem('token'); localStorage.removeItem('role'); localStorage.removeItem('roles'); localStorage.removeItem('username'); localStorage.removeItem('current_tab'); } catch {} setAuthed(false) }} />
       <Breadcrumb tab={tab} />
-      {isMobile ? (
-        <NavMenu items={navItems.filter(i => allowedTabs.includes(i.key))} active={tab} onSelect={(k) => go(k)} />
-      ) : (
+      {!isMobile && (
         <div className="compact-tabs">
           {navItems.filter(i => allowedTabs.includes(i.key)).map(item => (
             <button key={item.key} className={`tab ${tab===item.key?'active':''}`} onClick={() => go(item.key)}>{item.label}</button>
@@ -287,8 +286,8 @@ export default function App() {
               </div>
               <div className="muted">Chế độ giao diện</div>
               <div>
-                <button className="btn" onClick={() => { document.documentElement.setAttribute('data-device','mobile'); localStorage.setItem('device','mobile') }}>Mobile</button>
-                <button className="btn" style={{ marginLeft:6 }} onClick={() => { document.documentElement.setAttribute('data-device','pc'); localStorage.setItem('device','pc') }}>PC</button>
+                <button className="btn" onClick={() => { document.documentElement.setAttribute('data-device','mobile'); localStorage.setItem('device','mobile'); setIsMobile(true) }}>Mobile</button>
+                <button className="btn" style={{ marginLeft:6 }} onClick={() => { document.documentElement.setAttribute('data-device','pc'); localStorage.setItem('device','pc'); setIsMobile(false) }}>PC</button>
               </div>
               <div className="muted">Cài đặt App</div>
               <div>
