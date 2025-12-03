@@ -3,7 +3,7 @@
 @media (min-width:769px){ .container>h1.glass{display:none} }
 .tabs{margin-bottom:6px;display:flex;gap:8px;flex-wrap:wrap;position:fixed;top:40px;left:0;right:0;background:var(--bg);padding:6px 12px;min-height:40px;box-sizing:border-box;z-index:10000;overflow:visible;border-bottom:1px solid var(--border);box-shadow:0 2px 8px rgba(0,0,0,.06)}
 [data-device="pc"] .mobile-toolbar{display:none !important}
-.container[data-device="pc"], [data-device="pc"] .container{padding-top:128px}
+.container[data-device="pc"], [data-device="pc"] .container{padding-top:96px}
 .mobile-toolbar{display:none}
 [data-device="mobile"] .mobile-toolbar{display:flex}
 [data-device="mobile"] .container{padding-top:calc(96px + env(safe-area-inset-top, 0px))}
@@ -412,3 +412,4 @@ html{scroll-behavior:smooth; background: var(--bg)}
 }
 .menu-bar{position:fixed;top:96px;left:0;right:0;background:#FFFFFF;border-bottom:1px solid #E5E7EB;padding:8px 16px;z-index:10000}
 [data-device="mobile"] .menu-bar{display:none}
+[data-device="pc"] .menu-bar{display:none}
