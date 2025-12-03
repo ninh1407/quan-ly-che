@@ -3044,16 +3044,18 @@ app.delete('/admin/wipe', requireAdmin, async (req, res) => {
 app.post('/auth/login', rateLimit(60_000, 5, 'login'), (req, res) => {
   const b = req.body || {};
   const q = req.query || {};
-  const username = b.username ?? q.username ?? b.u ?? q.u;
-  const password = b.password ?? q.password ?? b.p ?? q.p;
+  const username = (b.username ?? q.username ?? b.u ?? q.u);
+  const password = (b.password ?? q.password ?? b.p ?? q.p);
+  const uname = String(username||'').trim();
+  const pwd = String(password||'').trim();
   const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').toString();
   const ua = String(req.headers['user-agent'] || '');
-  if (!username || !password) return res.status(400).json({ message: 'Missing username/password' });
+  if (!uname || !pwd) return res.status(400).json({ message: 'Missing username/password' });
   if (isLockedUser(username)) return res.status(429).json({ message: 'Account temporarily locked' })
   if (MONGO_READY) {
-    return mongoDb.collection('users').findOne({ username }).then(row => {
+    return mongoDb.collection('users').findOne({ username: uname }).then(row => {
       if (!row) return res.status(401).json({ message: 'Invalid credentials' });
-      const ok = bcrypt.compareSync(password, row.password_hash || '');
+      const ok = bcrypt.compareSync(pwd, row.password_hash || '');
       if (!ok) { onLoginFail(username); mongoDb.collection('security_logs').insertOne({ ts: new Date().toISOString(), username, success: 0, ip, ua, city: '', note: 'login_fail' }).catch(()=>{}); return res.status(401).json({ message: 'Invalid credentials' }); }
       // 2FA if enabled
       // 2FA disabled
@@ -3068,10 +3070,10 @@ app.post('/auth/login', rateLimit(60_000, 5, 'login'), (req, res) => {
     }).catch(err => res.status(500).json({ message: 'DB error', detail: err.message }));
   }
   if (!SQLITE_READY) return res.status(500).json({ message: 'DB error', detail: 'SQLite disabled' });
-  db.get(`SELECT id, username, password_hash, role FROM users WHERE username = ?`, [username], (err, row) => {
+  db.get(`SELECT id, username, password_hash, role FROM users WHERE username = ?`, [uname], (err, row) => {
     if (err) return res.status(500).json({ message: 'DB error', detail: err.message });
     if (!row) return res.status(401).json({ message: 'Invalid credentials' });
-    const ok = bcrypt.compareSync(password, row.password_hash || '');
+    const ok = bcrypt.compareSync(pwd, row.password_hash || '');
     if (!ok) { onLoginFail(username); db.run(`INSERT INTO security_logs (ts, username, success, ip, ua, city, note) VALUES (?,?,?,?,?,?,?)`, [new Date().toISOString(), username, 0, ip, ua, '', 'login_fail'], () => {}); return res.status(401).json({ message: 'Invalid credentials' }); }
     // 2FA if enabled
     // 2FA disabled
@@ -3134,7 +3136,9 @@ app.get('/users', requireAdmin, (req, res) => {
 });
 
 app.post('/users', rateLimit(60_000, 10, 'admin'), requireAdmin, (req, res) => {
-  const { username, password, role = 'user' } = req.body;
+  let { username, password, role = 'user' } = req.body;
+  username = String(username||'').trim();
+  password = String(password||'').trim();
   if (!username || !password) return res.status(400).json({ message: 'Missing username/password' });
   if (String(password).length < 8) return res.status(400).json({ message: 'Weak password' });
   const hash = bcrypt.hashSync(String(password), 12);
@@ -3631,6 +3635,25 @@ function onLoginFail(username){
 }
 function onLoginSuccess(username){ LOGIN_FAIL.delete(String(username||'')) }
 // 2FA endpoints removed per request
+// Admin unlock user and clear session (use when account is temporarily locked)
+app.post('/admin/unlock-user', requireAdmin, async (req, res) => {
+  try {
+    const { username } = req.body || {}
+    if (!username) return res.status(400).json({ message: 'Missing username' })
+    LOGIN_FAIL.delete(String(username||''))
+    if (MONGO_READY) {
+      try { await mongoDb.collection('users').updateOne({ username: String(username) }, { $set: { session_id: '' } }) } catch {}
+      return res.json({ unlocked: 1 })
+    }
+    if (!SQLITE_READY) return res.status(500).json({ message: 'No storage backend ready' })
+    db.run(`UPDATE users SET session_id = NULL WHERE username = ?`, [String(username)], function(err){
+      if (err) return res.status(500).json({ message: 'DB error', detail: err.message })
+      res.json({ unlocked: 1 })
+    })
+  } catch (e) {
+    res.status(500).json({ message: 'Unlock error', detail: e.message })
+  }
+})
 app.get('/admin/db-check', requireAdmin, (req, res) => {
   const out = { sqlite: { ready: SQLITE_READY }, mongo: { ready: !!MONGO_READY } }
   if (!SQLITE_READY) return res.json(out)
