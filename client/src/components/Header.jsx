@@ -23,7 +23,7 @@ export default function Header({ theme, onToggleTheme, onOpenMenu, onOpenAccount
         <button className="btn" onClick={onToggleTheme}>{theme === 'light' ? '🌙' : (theme==='dark' ? '🍵' : (theme==='tea' ? '🪵' : '☀️'))}</button>
         <button className="btn" onClick={onOpenNotif} aria-label="Thông báo">🔔</button>
         <details className="dropdown" style={{ marginLeft: 8 }}>
-          <summary className="btn avatar"><span className="circle" style={{ width:32, height:32 }}>{initials}</span> {name} ▾</summary>
+          <summary className="btn avatar"><span className="circle">{initials}</span> {name} ▾</summary>
           <div className="dropdown-menu">
             <button className="btn" onClick={onOpenAccount}>Tài khoản</button>
             <button className="btn" onClick={onOpenNotif}>Thông báo</button>

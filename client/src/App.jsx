@@ -44,6 +44,7 @@ export default function App() {
   const allowedTabs = hasRole('admin')
     ? ['dashboard','balanceSheet','finishedStock','sales','purchases','expenses','debts','season','suppliers','customers','receipts','changePwd','admin','stats','tradeStats']
     : Array.from(new Set([
+        'dashboard',
         ...(hasRole('seller') ? ['sales'] : []),
         ...(hasRole('warehouse') ? ['purchases','finishedStock'] : []),
         ...(hasRole('finance') ? ['dashboard','balanceSheet','expenses','debts','receipts'] : []),
@@ -168,7 +169,7 @@ export default function App() {
     return (
       <div className="container">
         <h1 className="glass">Quản lý Chè</h1>
-        <Login onSuccess={() => setAuthed(true)} onLogout={() => setAuthed(false)} />
+        <Login onSuccess={() => { setAuthed(true); setTab('dashboard'); try { localStorage.setItem('current_tab','dashboard') } catch {} }} onLogout={() => setAuthed(false)} />
       </div>
     )
   }
