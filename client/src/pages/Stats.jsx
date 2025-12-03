@@ -124,7 +124,7 @@ export default function Stats() {
     const csv = [cols.join(','), ...rows.map(row => row.map(v => (v != null ? v : '')).join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = `report_${reportType}_${year}-${String(month).padStart(2,'0')}.csv`; a.click(); URL.revokeObjectURL(url)
+    const a = document.createElement('a'); a.href = url; a.download = `bao_cao_${reportType}_${year}-${String(month).padStart(2,'0')}.csv`; a.click(); URL.revokeObjectURL(url)
     saveHistory({ kind:'csv' })
   }
   const exportPdf = () => {
@@ -136,7 +136,7 @@ export default function Stats() {
       const txt = (val != null && typeof val.toLocaleString === 'function') ? val.toLocaleString('vi-VN') : val
       return `<td>${txt}</td>`
     }).join('')}</tr>`).join('')
-    w.document.write(`<!doctype html><html><head><title>Bao cao ${year}-${String(month).padStart(2,'0')}</title><style>body{font-family:sans-serif}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:6px;text-align:left}td:nth-child(n+2){text-align:right}h3{margin:12px 0}</style></head><body><h3>Báo cáo ${year}-${String(month).padStart(2,'0')}</h3><div>Loại: ${reportType}</div><table><thead>${header}</thead><tbody>${rowsHtml}</tbody></table></body></html>`)
+    w.document.write(`<!doctype html><html><head><meta charset=\"utf-8\"><title>Báo cáo ${year}-${String(month).padStart(2,'0')}</title><style>body{font-family:sans-serif}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:6px;text-align:left}td:nth-child(n+2){text-align:right}h3{margin:12px 0}</style></head><body><h3>Báo cáo ${year}-${String(month).padStart(2,'0')}</h3><div>Loại: ${reportType}</div><table><thead>${header}</thead><tbody>${rowsHtml}</tbody></table></body></html>`)
     w.document.close(); w.focus(); w.print()
     saveHistory({ kind:'pdf' })
   }

@@ -224,7 +224,7 @@ export default function Purchases() {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `purchases_${year}-${String(month).padStart(2,'0')}.csv`; a.click();
+    a.href = url; a.download = `nhap_che_${year}-${String(month).padStart(2,'0')}.csv`; a.click();
     URL.revokeObjectURL(url);
   };
 

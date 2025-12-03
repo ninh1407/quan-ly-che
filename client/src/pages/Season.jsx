@@ -267,7 +267,7 @@ export default function Season() {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `season_${monthsLabel.replace(/\s|\//g,'_')}.csv`; a.click();
+    a.href = url; a.download = `mua_vu_${monthsLabel.replace(/\s|\//g,'_')}.csv`; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -299,7 +299,7 @@ export default function Season() {
       `<td style="text-align:right">${fmtMoney(s.paid_amount)}</td>`+
       `<td style="text-align:right">${fmtMoney(s.pending_amount)}</td>`+
     `</tr>`).join('');
-    w.document.write(`<!doctype html><html><head><title>Season ${monthsLabel}</title><style>
+    w.document.write(`<!doctype html><html><head><meta charset=\"utf-8\"><title>Báo cáo Đợt (${monthsLabel})</title><style>
       body{font-family:sans-serif}
       table{border-collapse:collapse;width:100%}
       th,td{border:1px solid #ccc;padding:6px;text-align:left}

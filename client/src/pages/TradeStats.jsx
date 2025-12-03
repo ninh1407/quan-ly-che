@@ -57,7 +57,7 @@ export default function TradeStats() {
     const saleRows = sales.map(r=> ['Bán', r.sale_date, r.ticket_name||'', r.customer_name||'', r.weight, r.price_per_kg, r.total_amount, r.payment_status])
     const purchRows = purchases.map(r=> ['Nhập', r.purchase_date, r.ticket_name||'', r.supplier_name||'', (r.net_weight != null ? r.net_weight : r.weight), r.unit_price, r.total_cost, r.payment_status])
     const csv = [headers, ...saleRows, ...purchRows].map(row => row.map(v => (v ?? '')).join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`trade_${year}-${String(month).padStart(2,'0')}.csv`; a.click(); URL.revokeObjectURL(url)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`giao_dich_${year}-${String(month).padStart(2,'0')}.csv`; a.click(); URL.revokeObjectURL(url)
   }
 
   return (<>

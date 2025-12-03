@@ -178,7 +178,15 @@ export default function App() {
       <div className="container">
       <Header theme={theme} onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : (theme==='dark' ? 'tea' : (theme==='tea' ? 'wood' : 'light')))} onOpenMenu={() => setMenuOpen(true)} onOpenAccount={() => setAccountOpen(true)} onOpenNotif={() => setNotifOpen(true)} onOpenSettings={() => setSettingsOpen(true)} onInstallApp={installApp} installEvt={installEvt} isIOS={isIOS} onOpenIosGuide={() => setIosGuideOpen(true)} onOpenChangePwd={() => setTab('changePwd')} onLogout={() => { try { localStorage.removeItem('token'); localStorage.removeItem('role'); localStorage.removeItem('roles'); localStorage.removeItem('username'); localStorage.removeItem('current_tab'); } catch {} setAuthed(false) }} />
       <Breadcrumb tab={tab} />
-      <NavMenu items={navItems.filter(i => allowedTabs.includes(i.key))} active={tab} onSelect={(k) => go(k)} />
+      {isMobile ? (
+        <NavMenu items={navItems.filter(i => allowedTabs.includes(i.key))} active={tab} onSelect={(k) => go(k)} />
+      ) : (
+        <div className="compact-tabs">
+          {navItems.filter(i => allowedTabs.includes(i.key)).map(item => (
+            <button key={item.key} className={`tab ${tab===item.key?'active':''}`} onClick={() => go(item.key)}>{item.label}</button>
+          ))}
+        </div>
+      )}
       {menuOpen && (
         <div className="drawer open" onClick={() => setMenuOpen(false)}>
           <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
