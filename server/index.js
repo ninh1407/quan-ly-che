@@ -14,9 +14,6 @@ app.disable('x-powered-by')
 app.set('trust proxy', 1)
 app.use(helmet({ contentSecurityPolicy: false, hsts: false }))
 app.disable('x-powered-by')
-const LICENSE_SHEET_CSV_URL = process.env.LICENSE_SHEET_CSV_URL || ''
-const LICENSE_APP_ID = process.env.LICENSE_APP_ID || ''
-let LICENSE_LAST = { ok: true, message: '', expires: null, key: '' }
 const BACKUPS_DIR = process.env.BACKUPS_DIR || path.join(__dirname, 'backups');
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || '').split(',').map(s=>s.trim()).filter(Boolean)
 const DEV_ORIGIN_OK = /^(https?:\/\/localhost(:\d+)?|https?:\/\/127\.0\.0\.1(:\d+)?|https?:\/\/192\.168\.\d+\.\d+(:\d+)?)/
@@ -55,35 +52,6 @@ app.use((req, res, next) => {
 })
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
-async function refreshLicense(){
-  if (!LICENSE_SHEET_CSV_URL || !LICENSE_APP_ID) { LICENSE_LAST = { ok: true, message: '', expires: null, key: '' }; return }
-  try {
-    const r = await fetch(LICENSE_SHEET_CSV_URL, { cache:'no-store' })
-    const text = await r.text()
-    const lines = String(text||'').split(/\r?\n/).filter(x=>x.trim().length)
-    if (!lines.length) { LICENSE_LAST = { ok:false, message:'No data', expires:null, key:'' }; return }
-    const headers = lines[0].split(',').map(h=>h.trim().toLowerCase())
-    const idxApp = headers.indexOf('app_id')
-    const idxKey = headers.indexOf('license_key')
-    const idxStatus = headers.indexOf('status')
-    const idxExpires = headers.indexOf('expires')
-    let found = null
-    for (let i=1;i<lines.length;i++){
-      const cols = lines[i].split(',').map(x=>x.trim())
-      if (String(cols[idxApp]||'') === LICENSE_APP_ID) { found = cols; break }
-    }
-    if (!found) { LICENSE_LAST = { ok:false, message:'Not found', expires:null, key:'' }; return }
-    const status = String(found[idxStatus]||'').toLowerCase()
-    const expStr = String(found[idxExpires]||'').trim()
-    const exp = expStr ? new Date(expStr) : null
-    const ok = status==='active' && (!exp || exp>new Date())
-    LICENSE_LAST = { ok, message: ok?'':'License invalid or expired', expires: exp? exp.toISOString(): null, key: String(found[idxKey]||'') }
-  } catch (e) {
-    LICENSE_LAST = { ok:false, message:'Fetch error', expires:null, key:'' }
-  }
-}
-setTimeout(() => { refreshLicense() }, 1000)
-setInterval(() => { refreshLicense() }, 5*60*1000)
 app.use((req, res, next) => {
   const p = String(req.path || '')
   if (p.startsWith('/auth') || p.startsWith('/admin')) {
@@ -133,28 +101,6 @@ if (SQLITE_READY) {
   ensureColumn('sales','invoice_no','TEXT');
   ensureColumn('purchases','invoice_no','TEXT');
   ensureColumn('expenses','invoice_no','TEXT');
-  try {
-    db.serialize(() => {
-      db.run(`CREATE TABLE IF NOT EXISTS licenses (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        license_key TEXT UNIQUE,
-        plan TEXT,
-        status TEXT,
-        expiry TEXT,
-        owner TEXT,
-        max_devices INTEGER DEFAULT 1,
-        issued_at TEXT
-      )`)
-      db.run(`CREATE TABLE IF NOT EXISTS license_devices (
-        license_key TEXT,
-        hwid TEXT,
-        bound_at TEXT,
-        UNIQUE(license_key, hwid)
-      )`)
-      db.run(`CREATE INDEX IF NOT EXISTS idx_lic_key ON licenses(license_key)`)
-      db.run(`CREATE INDEX IF NOT EXISTS idx_lic_dev_key ON license_devices(license_key)`)
-    })
-  } catch {}
 }
 
 function ensureBackupDir() {
@@ -293,10 +239,6 @@ function restoreMongo(name) {
       resolve();
     } catch (e) { reject(e); }
   })
-}
-const LICENSE_SIGN_SECRET = process.env.LICENSE_SIGN_SECRET || ''
-function hmacSign(obj){
-  try { const crypto = require('crypto'); return crypto.createHmac('sha256', LICENSE_SIGN_SECRET).update(JSON.stringify(obj)).digest('hex') } catch { return '' }
 }
 setTimeout(() => { try { if (MONGO_READY) { backupMongoNow(); } else if (SQLITE_READY) { backupSqliteNow(); } } catch {} }, 5_000);
 setInterval(() => { try { if (MONGO_READY) { backupMongoNow(); } else if (SQLITE_READY) { backupSqliteNow(); } } catch {} }, 24*3600*1000);
@@ -2789,10 +2731,6 @@ app.get('/health', (req, res) => {
   }
 });
 
-app.get('/license', (req, res) => {
-  res.json({ ok: !!LICENSE_LAST?.ok, message: LICENSE_LAST?.message || '', expires: LICENSE_LAST?.expires || null })
-})
-
 // App version endpoint for client auto-refresh
 app.get('/version', (req, res) => {
   try {
@@ -2975,77 +2913,6 @@ app.get('/chat/users', requireAuth, (req, res) => {
 })
 app.get('/admin/backups', requireAdmin, (req, res) => {
   try { res.json(backupSqliteList()) } catch (e) { res.status(500).json({ message: 'Lỗi tải danh sách bản sao lưu', detail: e.message }) }
-})
-app.post('/admin/license/reload', requireAdmin, async (req, res) => {
-  try { await refreshLicense(); res.json({ ok: !!LICENSE_LAST?.ok, message: LICENSE_LAST?.message || '', expires: LICENSE_LAST?.expires || null }) } catch (e) { res.status(500).json({ message: 'License reload error', detail: e.message }) }
-})
-app.post('/license/issue-key', requireAdmin, (req, res) => {
-  const { plan='basic', expiry, owner='', max_devices=1 } = req.body || {}
-  const license_key = (require('crypto').randomBytes(12).toString('hex')).toUpperCase()
-  if (!SQLITE_READY) return res.status(500).json({ message:'DB error' })
-  const issued_at = new Date().toISOString()
-  db.run(`INSERT INTO licenses(license_key, plan, status, expiry, owner, max_devices, issued_at) VALUES(?,?,?,?,?,?,?)`, [license_key, plan, 'active', String(expiry||''), owner, Number(max_devices)||1, issued_at], function(e){
-    if (e) return res.status(500).json({ message:'DB error', detail:e.message })
-    res.json({ license_key, plan, expiry, owner, max_devices, issued_at })
-  })
-})
-app.post('/license/activate', rateLimit(60_000, 10, 'license'), async (req, res) => {
-  const { key, hwid } = req.body || {}
-  if (!key || !hwid) return res.status(400).json({ message:'Missing key/hwid' })
-  if (!SQLITE_READY) return res.status(500).json({ message:'DB error' })
-  db.get(`SELECT license_key, plan, status, expiry, owner, max_devices, issued_at FROM licenses WHERE license_key = ?`, [String(key)], (e, lic) => {
-    if (e) return res.status(500).json({ message:'DB error', detail:e.message })
-    if (!lic) return res.status(404).json({ message:'License not found' })
-    if (String(lic.status||'')!=='active') return res.status(403).json({ message:'License inactive' })
-    const exp = lic.expiry ? new Date(String(lic.expiry)) : null
-    if (exp && exp <= new Date()) return res.status(403).json({ message:'License expired' })
-    db.all(`SELECT hwid FROM license_devices WHERE license_key = ?`, [lic.license_key], (e2, rows) => {
-      if (e2) return res.status(500).json({ message:'DB error', detail:e2.message })
-      const boundList = (rows||[]).map(r=>String(r.hwid))
-      const already = boundList.includes(String(hwid))
-      if (!already && boundList.length >= (Number(lic.max_devices)||1)) return res.status(403).json({ message:'Max devices reached' })
-      const doRespond = () => {
-        const claims = { key: lic.license_key, hwid: String(hwid), plan: lic.plan, expiry: lic.expiry||null, issued_at: lic.issued_at, app_id: LICENSE_APP_ID || '' }
-        const signature = LICENSE_SIGN_SECRET ? hmacSign(claims) : ''
-        res.json({ claims, signature })
-      }
-      if (already) return doRespond()
-      db.run(`INSERT OR IGNORE INTO license_devices(license_key, hwid, bound_at) VALUES(?,?,?)`, [lic.license_key, String(hwid), new Date().toISOString()], function(e3){
-        if (e3) return res.status(500).json({ message:'DB error', detail:e3.message })
-        doRespond()
-      })
-    })
-  })
-})
-app.post('/license/verify', rateLimit(60_000, 20, 'license'), (req, res) => {
-  const { claims, signature } = req.body || {}
-  if (!claims) return res.status(400).json({ message:'Missing claims' })
-  const sig = LICENSE_SIGN_SECRET ? hmacSign(claims) : ''
-  const ok = (!!LICENSE_SIGN_SECRET && sig === String(signature||''))
-  const exp = claims?.expiry ? new Date(String(claims.expiry)) : null
-  const valid = ok && (!exp || exp > new Date())
-  res.json({ ok: valid })
-})
-app.post('/license/deactivate', requireAdmin, (req, res) => {
-  const { key, hwid } = req.body || {}
-  if (!key || !hwid) return res.status(400).json({ message:'Missing key/hwid' })
-  if (!SQLITE_READY) return res.status(500).json({ message:'DB error' })
-  db.run(`DELETE FROM license_devices WHERE license_key = ? AND hwid = ?`, [String(key), String(hwid)], function(e){
-    if (e) return res.status(500).json({ message:'DB error', detail:e.message })
-    res.json({ removed: this.changes })
-  })
-})
-app.post('/license/transfer', requireAdmin, (req, res) => {
-  const { key, old_hwid, new_hwid } = req.body || {}
-  if (!key || !old_hwid || !new_hwid) return res.status(400).json({ message:'Missing params' })
-  if (!SQLITE_READY) return res.status(500).json({ message:'DB error' })
-  db.run(`DELETE FROM license_devices WHERE license_key = ? AND hwid = ?`, [String(key), String(old_hwid)], function(e){
-    if (e) return res.status(500).json({ message:'DB error', detail:e.message })
-    db.run(`INSERT OR IGNORE INTO license_devices(license_key, hwid, bound_at) VALUES(?,?,?)`, [String(key), String(new_hwid), new Date().toISOString()], function(e2){
-      if (e2) return res.status(500).json({ message:'DB error', detail:e2.message })
-      res.json({ ok: 1 })
-    })
-  })
 })
 app.post('/admin/backup', rateLimit(60_000, 5, 'admin'), requireAdmin, async (req, res) => {
   try {
@@ -3250,7 +3117,6 @@ app.post('/auth/login', rateLimit(60_000, 5, 'login'), (req, res) => {
   const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').toString();
   const ua = String(req.headers['user-agent'] || '');
   if (!uname || !pwd) return res.status(400).json({ message: 'Missing username/password' });
-  if (LICENSE_SHEET_CSV_URL && LICENSE_APP_ID && !LICENSE_LAST.ok) return res.status(403).json({ message: LICENSE_LAST.message || 'License invalid' })
   if (isLockedUser(username)) return res.status(429).json({ message: 'Account temporarily locked' })
   if (MONGO_READY) {
     return mongoDb.collection('users').findOne({ username: uname }).then(row => {
