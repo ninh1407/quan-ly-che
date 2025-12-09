@@ -22,6 +22,7 @@ import Admin from './pages/Admin.jsx'
 import ChangePassword from './pages/ChangePassword.jsx'
 import Receipts from './pages/Receipts.jsx'
 import BottomNav from './components/BottomNav.jsx'
+import LicenseModal from './components/LicenseModal.jsx'
  
 
 export default function App() {
@@ -39,6 +40,7 @@ export default function App() {
   const [isIOS, setIsIOS] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [badges, setBadges] = useState({ sales: 0, purchases: 0 })
+  const [licenseOpen, setLicenseOpen] = useState(false)
   const rolesRaw = (() => { try { const r = JSON.parse(localStorage.getItem('roles')||'null'); if (Array.isArray(r)) return r; } catch {} const s = (localStorage.getItem('role')||'user'); return String(s).split(',').map(x=>x.trim()).filter(Boolean) })()
   const hasRole = (name) => rolesRaw.includes(name)
   const allowedTabs = hasRole('admin')
@@ -88,6 +90,25 @@ export default function App() {
       document.documentElement.setAttribute('data-device', 'pc')
       localStorage.setItem('device', 'pc')
     }
+  }, [])
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await api.get('/license')
+        const ok = !!r.data?.ok
+        if (!ok) setLicenseOpen(true)
+        else {
+          const raw = localStorage.getItem('license_claims')
+          if (raw) {
+            try {
+              const obj = JSON.parse(raw)
+              const v = await api.post('/license/verify', obj)
+              if (!v.data?.ok) setLicenseOpen(true)
+            } catch {}
+          }
+        }
+      } catch {}
+    })()
   }, [])
   useEffect(() => {
     const h = (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setCmdOpen(true) } }
@@ -170,6 +191,7 @@ export default function App() {
       <div className="container">
         <h1 className="glass">Quản lý Chè</h1>
         <Login onSuccess={() => { setAuthed(true); setTab('dashboard'); try { localStorage.setItem('current_tab','dashboard') } catch {} }} onLogout={() => setAuthed(false)} />
+        <LicenseModal open={licenseOpen} onClose={() => setLicenseOpen(false)} onActivated={() => setLicenseOpen(false)} />
       </div>
     )
   }
@@ -320,6 +342,7 @@ export default function App() {
       {isMobile && (
         <BottomNav tab={tab} onNavigate={(k) => go(k)} allowedTabs={allowedTabs} />
       )}
+      <LicenseModal open={licenseOpen} onClose={() => setLicenseOpen(false)} onActivated={() => setLicenseOpen(false)} />
     </div>
   )
 }
