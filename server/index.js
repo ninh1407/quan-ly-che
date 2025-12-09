@@ -16,6 +16,7 @@ app.use(helmet({ contentSecurityPolicy: false, hsts: false }))
 app.disable('x-powered-by')
 const BACKUPS_DIR = process.env.BACKUPS_DIR || path.join(__dirname, 'backups');
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || '').split(',').map(s=>s.trim()).filter(Boolean)
+const DEV_ORIGIN_OK = /^(https?:\/\/localhost(:\d+)?|https?:\/\/127\.0\.0\.1(:\d+)?|https?:\/\/192\.168\.\d+\.\d+(:\d+)?)/
 const ALLOW_DEV_ORIGIN = String(process.env.ALLOW_DEV_ORIGIN||'').toLowerCase()==='true'
 app.use((req, res, next) => {
   const origin = String(req.headers.origin || '')
