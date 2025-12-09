@@ -138,7 +138,7 @@ function pruneBackupsByCount(count) {
   try {
     ensureBackupDir();
     const files = fs.readdirSync(BACKUPS_DIR)
-      .filter(f => f.endsWith('.db') || f.endsWith('.json'))
+      .filter(f => f.endsWith('.db') || f.endsWith('.db.gz') || f.endsWith('.json'))
       .sort((a,b)=> b.localeCompare(a));
     for (let i = count; i < files.length; i++) {
       try { fs.unlinkSync(path.join(BACKUPS_DIR, files[i])) } catch {}
@@ -147,15 +147,27 @@ function pruneBackupsByCount(count) {
 }
 function backupSqliteNow() {
   ensureBackupDir();
-  const name = `sqlite-${timestamp()}.db`;
+  const name = `sqlite-${timestamp()}.db.gz`;
   const src = dbPath; const dest = path.join(BACKUPS_DIR, name);
-  fs.copyFileSync(src, dest);
-  pruneBackupsByCount(3);
-  return name;
+  try {
+    const zlib = require('zlib');
+    const inp = fs.createReadStream(src);
+    const out = fs.createWriteStream(dest);
+    inp.pipe(zlib.createGzip({ level: 9 })).pipe(out);
+    return new Promise((resolve) => {
+      out.on('close', () => { pruneBackupsByCount(3); resolve(name) });
+      out.on('error', () => { try { fs.unlinkSync(dest) } catch {}; resolve(null) })
+    })
+  } catch (e) {
+    // fallback: plain copy
+    fs.copyFileSync(src, dest.replace(/\.gz$/, ''));
+    pruneBackupsByCount(3);
+    return dest.replace(/\.gz$/, '')
+  }
 }
 function backupSqliteList() {
   ensureBackupDir();
-  return fs.readdirSync(BACKUPS_DIR).filter(f => f.endsWith('.db') || f.endsWith('.json')).sort((a,b)=> b.localeCompare(a));
+  return fs.readdirSync(BACKUPS_DIR).filter(f => f.endsWith('.db') || f.endsWith('.db.gz') || f.endsWith('.json')).sort((a,b)=> b.localeCompare(a));
 }
 function restoreSqlite(name, cb) {
   try {
@@ -164,7 +176,28 @@ function restoreSqlite(name, cb) {
     if (SQLITE_READY) {
       try { db.close(); } catch {}
     }
-    fs.copyFileSync(src, dbPath);
+    if (String(name).endsWith('.gz')) {
+      try {
+        const zlib = require('zlib');
+        const inp = fs.createReadStream(src);
+        const out = fs.createWriteStream(dbPath);
+        inp.pipe(zlib.createGunzip()).pipe(out);
+        out.on('close', () => {
+          if (SQLITE_READY) {
+            db = new sqlite3.Database(dbPath);
+            db.exec('PRAGMA journal_mode = WAL');
+            db.exec('PRAGMA busy_timeout = 3000');
+          }
+          cb(null);
+        })
+        out.on('error', (e) => cb(e))
+        return;
+      } catch (e) {
+        return cb(e)
+      }
+    } else {
+      fs.copyFileSync(src, dbPath);
+    }
     if (SQLITE_READY) {
       db = new sqlite3.Database(dbPath);
       db.exec('PRAGMA journal_mode = WAL');
@@ -2882,6 +2915,19 @@ app.get('/admin/backups', requireAdmin, (req, res) => {
 })
 app.post('/admin/backup', rateLimit(60_000, 5, 'admin'), requireAdmin, async (req, res) => {
   try { const name = MONGO_READY ? await backupMongoNow() : backupSqliteNow(); res.json({ name }) } catch (e) { res.status(500).json({ message: 'Lỗi tạo bản sao lưu', detail: e.message }) }
+})
+app.get('/admin/backup/download', requireAdmin, (req, res) => {
+  try {
+    const name = String((req.query&&req.query.name)||'')
+    if (!name) return res.status(400).json({ message: 'Thiếu tên bản sao lưu' })
+    const p = path.join(BACKUPS_DIR, name)
+    if (!fs.existsSync(p)) return res.status(404).json({ message: 'Không tìm thấy file sao lưu' })
+    res.setHeader('Content-Type', name.endsWith('.json') ? 'application/json' : 'application/octet-stream')
+    res.setHeader('Content-Disposition', `attachment; filename="${name}"`)
+    fs.createReadStream(p).pipe(res)
+  } catch (e) {
+    res.status(500).json({ message: 'Tải bản sao lưu lỗi', detail: e.message })
+  }
 })
 app.post('/admin/restore', requireAdmin, async (req, res) => {
   const { name } = req.body || {};

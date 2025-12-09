@@ -86,6 +86,13 @@ export default function Admin() {
   useEffect(() => { loadBackups() }, [])
   const createBackup = async () => { try { const r = await api.post('/admin/backup'); await loadBackups(); alert(`Đã sao lưu: ${r.data?.name}`) } catch (e) { setError(e?.response?.data?.message || 'Sao lưu lỗi') } }
   const restoreBackup = async (name) => { if (!window.confirm(`Khôi phục từ ${name}?`)) return; try { await api.post('/admin/restore', { name }); alert('Khôi phục xong, vui lòng tải lại trang'); } catch (e) { setError(e?.response?.data?.message || 'Khôi phục lỗi') } }
+  const downloadBackup = async (name) => {
+    try {
+      const r = await api.get('/admin/backup/download', { params: { name }, responseType: 'blob' })
+      const url = URL.createObjectURL(r.data)
+      const a = document.createElement('a'); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url)
+    } catch (e) { setError(e?.response?.data?.message || 'Tải bản sao lưu lỗi') }
+  }
   const [wipeConfirm, setWipeConfirm] = useState('')
   const wipeAll = async () => { if (String(wipeConfirm).toUpperCase() !== 'DELETE') { alert('Nhập DELETE để xác nhận'); return } try { const r = await api.post('/admin/wipe', { confirm: 'DELETE' }); alert(`Đã xóa toàn bộ dữ liệu. Xóa ${r.data?.cleared?.length||0} bảng, ${r.data?.files_removed||0} ảnh.`) } catch (e) { setError(e?.response?.data?.message || 'Xóa dữ liệu lỗi') } }
 
@@ -281,7 +288,7 @@ export default function Admin() {
             <thead><tr><th>Tên bản sao lưu</th><th>Hành động</th></tr></thead>
             <tbody>
               {(backupList||[]).map((b,i) => (
-                <tr key={i}><td>{b}</td><td><button className="btn" onClick={()=> restoreBackup(b)}>Khôi phục</button></td></tr>
+                <tr key={i}><td>{b}</td><td><button className="btn" onClick={()=> restoreBackup(b)}>Khôi phục</button><button className="btn" style={{ marginLeft:6 }} onClick={()=> downloadBackup(b)}>Tải về</button></td></tr>
               ))}
             </tbody>
           </table>
