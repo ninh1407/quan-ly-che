@@ -2914,7 +2914,11 @@ app.get('/admin/backups', requireAdmin, (req, res) => {
   try { res.json(backupSqliteList()) } catch (e) { res.status(500).json({ message: 'Lỗi tải danh sách bản sao lưu', detail: e.message }) }
 })
 app.post('/admin/backup', rateLimit(60_000, 5, 'admin'), requireAdmin, async (req, res) => {
-  try { const name = MONGO_READY ? await backupMongoNow() : backupSqliteNow(); res.json({ name }) } catch (e) { res.status(500).json({ message: 'Lỗi tạo bản sao lưu', detail: e.message }) }
+  try {
+    const name = MONGO_READY ? await backupMongoNow() : await backupSqliteNow();
+    if (!name) return res.status(500).json({ message: 'Lỗi tạo bản sao lưu' })
+    res.json({ name })
+  } catch (e) { res.status(500).json({ message: 'Lỗi tạo bản sao lưu', detail: e.message }) }
 })
 app.get('/admin/backup/download', requireAdmin, (req, res) => {
   try {
